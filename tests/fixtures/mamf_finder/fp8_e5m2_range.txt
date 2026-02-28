@@ -1,0 +1,10 @@
+mamf-finder.py: Matrix Multiply Performance Finder
+dtype: fp8_e5m2 | device: NVIDIA H100 80GB HBM3 | GPU 0
+
+  M     N     K   TFLOPS
+1024  1024  1024   620.0
+2048  2048  2048  1120.3
+4096  4096  4096  1560.1
+8192  8192  8192  1750.4
+
+Best: M=8192, N=8192, K=8192, 1750.4 TFLOPS

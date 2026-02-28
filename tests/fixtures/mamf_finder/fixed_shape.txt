@@ -1,0 +1,8 @@
+mamf-finder.py: Matrix Multiply Performance Finder
+dtype: bf16 | device: NVIDIA H100 80GB HBM3 | GPU 0
+Fixed shape: M=4096, N=4096, K=4096
+
+  M     N     K   TFLOPS
+4096  4096  4096   789.2
+
+Result: M=4096, N=4096, K=4096, 789.2 TFLOPS

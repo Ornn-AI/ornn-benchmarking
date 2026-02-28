@@ -1,0 +1,10 @@
+{
+  "testname": "host_to_device_memcpy_ce",
+  "bandwidth_matrix": [
+    [25.3],
+    [25.1]
+  ],
+  "sum": 50.4,
+  "min": 25.1,
+  "max": 25.3
+}

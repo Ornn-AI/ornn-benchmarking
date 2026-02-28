@@ -1,0 +1,10 @@
+{
+  "testname": "device_to_device_bidirectional_memcpy_read_ce",
+  "bandwidth_matrix": [
+    [4079.0, 84.6],
+    [84.6, 4079.0]
+  ],
+  "sum": 8327.2,
+  "min": 84.6,
+  "max": 4079.0
+}

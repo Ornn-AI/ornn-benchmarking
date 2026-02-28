@@ -236,7 +236,22 @@ class RunOrchestrator:
 def build_section_runners() -> dict[str, SectionRunner]:
     """Build the default set of section runners.
 
-    Returns stub runners for all sections. Real benchmark runners will be
-    wired in by subsequent features.
+    Uses real runbook runners for pre-flight, compute, memory, and
+    interconnect sections. Post-flight and manifest use stubs pending
+    implementation by a subsequent feature.
     """
-    return {name: StubSectionRunner(name) for name in SECTION_ORDER}
+    from ornn_bench.runbook.compute import ComputeMatrixRunner
+    from ornn_bench.runbook.interconnect import InterconnectMatrixRunner
+    from ornn_bench.runbook.memory import MemoryMatrixRunner
+    from ornn_bench.runbook.preflight import PreflightRunner
+
+    runners: dict[str, SectionRunner] = {
+        "pre-flight": PreflightRunner(),
+        "compute": ComputeMatrixRunner(),
+        "memory": MemoryMatrixRunner(),
+        "interconnect": InterconnectMatrixRunner(),
+        # Post-flight and manifest: stub pending later feature
+        "post-flight": StubSectionRunner("post-flight"),
+        "manifest": StubSectionRunner("manifest"),
+    }
+    return runners
