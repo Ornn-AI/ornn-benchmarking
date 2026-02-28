@@ -12,6 +12,7 @@ requires-python = ">=3.10"
 authors = [
     {name = "Ornn AI"},
 ]
+keywords = ["gpu", "benchmark", "nvidia", "cuda", "inference", "training", "scoring"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -21,14 +22,24 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: System :: Benchmark",
+    "Environment :: Console",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Typing :: Typed",
 ]
+
 dependencies = [
     "typer>=0.9.0",
     "rich>=13.0.0",
     "pydantic>=2.0.0",
     "httpx>=0.25.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Ornn-AI/ornn-benchmarking"
+Repository = "https://github.com/Ornn-AI/ornn-benchmarking"
+"Bug Tracker" = "https://github.com/Ornn-AI/ornn-benchmarking/issues"
 
 [project.optional-dependencies]
 dev = [
