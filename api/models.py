@@ -85,3 +85,68 @@ class RunResponse(BaseModel):
     run_id: str = Field(..., description="Server-assigned run identifier.")
     received_at: str = Field(..., description="Server timestamp when run was received (ISO-8601).")
     stored_at: str = Field(..., description="Server timestamp when run was persisted (ISO-8601).")
+
+
+# ---------------------------------------------------------------------------
+# Verification endpoint models
+# ---------------------------------------------------------------------------
+
+
+class VerifyRequest(BaseModel):
+    """Request body for ``POST /api/v1/verify``.
+
+    Accepts the raw metric components and the client-computed scores for
+    server-side recomputation and comparison.
+    """
+
+    components: dict[str, float] = Field(
+        ..., description="Raw metric components (bw, fp8, bf16, ar)."
+    )
+    ornn_i: float | None = Field(
+        default=None, description="Client-computed Ornn-I score."
+    )
+    ornn_t: float | None = Field(
+        default=None, description="Client-computed Ornn-T score."
+    )
+    qualification: str | None = Field(
+        default=None, description="Client-computed qualification grade."
+    )
+
+
+class MetricDetailResponse(BaseModel):
+    """Per-metric comparison detail in a verification response."""
+
+    metric: str = Field(..., description="Metric name (ornn_i, ornn_t, qualification).")
+    submitted: float | None = Field(
+        default=None, description="Value submitted by the client."
+    )
+    server_computed: float | None = Field(
+        default=None, description="Value recomputed by the server."
+    )
+    match: bool = Field(..., description="Whether submitted and server values agree.")
+    delta: float | None = Field(
+        default=None, description="Absolute difference (for numeric metrics)."
+    )
+
+
+class VerifyResponse(BaseModel):
+    """Response body for ``POST /api/v1/verify``."""
+
+    status: str = Field(
+        ..., description="Verification outcome: 'verified' or 'mismatch'."
+    )
+    server_ornn_i: float | None = Field(
+        default=None, description="Server-recomputed Ornn-I score."
+    )
+    server_ornn_t: float | None = Field(
+        default=None, description="Server-recomputed Ornn-T score."
+    )
+    server_qualification: str | None = Field(
+        default=None, description="Server-recomputed qualification grade."
+    )
+    metric_details: list[MetricDetailResponse] = Field(
+        default_factory=list, description="Per-metric comparison details."
+    )
+    tolerance: float = Field(
+        ..., description="Absolute tolerance used for numeric comparisons."
+    )

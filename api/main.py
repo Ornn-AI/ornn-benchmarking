@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from api.config import get_settings
 from api.routers.health import router as health_router
 from api.routers.runs import router as runs_router
+from api.routers.verify import router as verify_router
 
 
 def create_app() -> FastAPI:
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     # --- routers --------------------------------------------------------
     application.include_router(health_router)
     application.include_router(runs_router)
+    application.include_router(verify_router)
 
     return application
 
