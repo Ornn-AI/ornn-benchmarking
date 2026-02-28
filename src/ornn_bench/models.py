@@ -26,6 +26,18 @@ class Qualification(str, Enum):
     BELOW = "Below"
 
 
+class ScoreStatus(str, Enum):
+    """Status of the scoring computation.
+
+    Provides explicit indication of scoring validity rather than
+    relying on callers to detect silent NaN or None.
+    """
+
+    VALID = "valid"
+    PARTIAL = "partial"
+    ERROR = "error"
+
+
 class GPUInfo(BaseModel):
     """GPU hardware information."""
 
@@ -47,6 +59,15 @@ class SystemInventory(BaseModel):
     pytorch_version: str = ""
 
 
+class PerGPUScoreRecord(BaseModel):
+    """Per-GPU score record for multi-GPU aggregation transparency."""
+
+    gpu_uuid: str
+    ornn_i: float | None = None
+    ornn_t: float | None = None
+    components: dict[str, float] = Field(default_factory=dict)
+
+
 class ScoreResult(BaseModel):
     """Computed Ornn scores."""
 
@@ -54,6 +75,10 @@ class ScoreResult(BaseModel):
     ornn_t: float | None = None
     qualification: Qualification | None = None
     components: dict[str, float] = Field(default_factory=dict)
+    score_status: ScoreStatus = ScoreStatus.ERROR
+    score_status_detail: str | None = None
+    aggregate_method: str | None = None
+    per_gpu_scores: list[PerGPUScoreRecord] = Field(default_factory=list)
 
 
 class SectionResult(BaseModel):

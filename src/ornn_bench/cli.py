@@ -15,6 +15,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from ornn_bench import __version__
+from ornn_bench.display import render_scorecard
+from ornn_bench.models import BenchmarkReport
 from ornn_bench.runner import RunOrchestrator, build_section_runners
 from ornn_bench.system import check_gpu_available, collect_environment_info
 
@@ -155,6 +157,9 @@ def run(
         summary_parts.append(f"[dim]{skipped} skipped[/dim]")
     console.print(f"\n  {' · '.join(summary_parts)} of {total} sections\n")
 
+    # Display scorecard (VAL-CLI-007)
+    render_scorecard(report.scores, console=console)
+
     if orch.has_failures:
         console.print(
             Panel(
@@ -270,8 +275,52 @@ def report(
     Reads the JSON report file and displays the scorecard in the terminal.
     Works on machines without GPU tools installed.
     """
-    typer.echo("Report command is not yet implemented.")
-    raise typer.Exit(code=1)
+    if not report_file.exists():
+        console.print(f"[red]Error:[/red] Report file not found: {report_file}")
+        raise typer.Exit(code=1)
+
+    try:
+        raw = report_file.read_text()
+        bench_report = BenchmarkReport.model_validate_json(raw)
+    except Exception as exc:
+        console.print(f"[red]Error:[/red] Failed to parse report: {exc}")
+        raise typer.Exit(code=1) from None
+
+    # Display report metadata
+    meta_table = Table(show_header=False, box=None, padding=(0, 2))
+    meta_table.add_column("Key", style="bold")
+    meta_table.add_column("Value")
+    meta_table.add_row("Report ID", bench_report.report_id)
+    meta_table.add_row("Created", bench_report.created_at)
+    meta_table.add_row("Schema Version", bench_report.schema_version)
+    console.print(
+        Panel(meta_table, title="[bold]Report Metadata[/bold]", border_style="blue")
+    )
+
+    # Section summary
+    if bench_report.sections:
+        section_table = Table(show_header=True, padding=(0, 2))
+        section_table.add_column("Section", style="bold")
+        section_table.add_column("Status")
+        for section in bench_report.sections:
+            status_style = {
+                "completed": "green",
+                "failed": "red",
+                "timeout": "yellow",
+                "skipped": "dim",
+                "pending": "dim",
+                "running": "cyan",
+            }.get(section.status.value, "")
+            section_table.add_row(
+                section.name,
+                f"[{status_style}]{section.status.value}[/{status_style}]",
+            )
+        console.print(
+            Panel(section_table, title="[bold]Sections[/bold]", border_style="blue")
+        )
+
+    # Scorecard display (VAL-CLI-007, VAL-CLI-008)
+    render_scorecard(bench_report.scores, console=console)
 
 
 # ---------------------------------------------------------------------------
