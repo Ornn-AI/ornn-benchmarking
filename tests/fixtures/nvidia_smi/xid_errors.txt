@@ -1,0 +1,2 @@
+Jan 15 10:32:15 gpu-node kernel: [12345.678] NVRM: Xid (PCI:0000:04:00): 48, pid=1234, name=mamf-finder, Ch 00000010
+Jan 15 10:33:20 gpu-node kernel: [12400.123] NVRM: Xid (PCI:0000:05:00): 63, pid=1235, name=nvbandwidth, Ch 00000011

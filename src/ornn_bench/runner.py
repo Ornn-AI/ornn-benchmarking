@@ -3,6 +3,9 @@
 Provides the :class:`RunOrchestrator` that executes benchmark sections
 in deterministic order, supports selective scope filtering, partial-failure
 continuation, and progress callbacks.
+
+Also provides :class:`DurableRunOrchestrator` for interruption-safe report
+persistence that writes completed section results incrementally.
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ import abc
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
+from pathlib import Path
 
 from ornn_bench.models import (
     BenchmarkReport,
@@ -22,12 +26,13 @@ from ornn_bench.models import (
 # Deterministic section execution order (VAL-RUNBOOK-007)
 # ---------------------------------------------------------------------------
 
-#: Canonical ordering: pre-flight → benchmarks → post-flight → manifest
+#: Canonical ordering: pre-flight → benchmarks → monitoring → post-flight → manifest
 SECTION_ORDER: tuple[str, ...] = (
     "pre-flight",
     "compute",
     "memory",
     "interconnect",
+    "monitoring",
     "post-flight",
     "manifest",
 )
@@ -35,6 +40,7 @@ SECTION_ORDER: tuple[str, ...] = (
 #: Sections that always run regardless of scope filters
 INFRASTRUCTURE_SECTIONS: frozenset[str] = frozenset({
     "pre-flight",
+    "monitoring",
     "post-flight",
     "manifest",
 })
@@ -187,6 +193,10 @@ class RunOrchestrator:
                 )
                 continue
 
+            # If this is the manifest runner, provide it the accumulated sections
+            if section_name == "manifest" and hasattr(runner, "set_sections"):
+                runner.set_sections(list(self._results))
+
             self._emit_progress(section_name, "started")
 
             try:
@@ -229,6 +239,154 @@ class RunOrchestrator:
 
 
 # ---------------------------------------------------------------------------
+# Durable orchestrator (VAL-RUNBOOK-009)
+# ---------------------------------------------------------------------------
+
+
+class DurableRunOrchestrator(RunOrchestrator):
+    """Orchestrator that persists report incrementally after each section.
+
+    Extends :class:`RunOrchestrator` to write the report to disk after
+    every section completes, ensuring that interrupted or failing runs
+    still have completed section outputs persisted.
+
+    Parameters
+    ----------
+    runners:
+        Mapping of section name → SectionRunner.
+    output_path:
+        Path where the JSON report is written incrementally.
+    scope:
+        Optional set of benchmark section names to run.
+    on_progress:
+        Optional progress callback.
+    """
+
+    def __init__(
+        self,
+        runners: dict[str, SectionRunner],
+        output_path: Path,
+        scope: set[str] | None = None,
+        on_progress: ProgressCallback | None = None,
+    ) -> None:
+        super().__init__(runners=runners, scope=scope, on_progress=on_progress)
+        self._output_path = output_path
+        self._report_id = str(uuid.uuid4())
+        self._created_at = datetime.now(timezone.utc).isoformat()
+
+    def _persist_current_state(self) -> None:
+        """Write current report state to disk."""
+        report = BenchmarkReport(
+            schema_version="1.0.0",
+            report_id=self._report_id,
+            created_at=self._created_at,
+            sections=list(self._results),
+        )
+        self._output_path.parent.mkdir(parents=True, exist_ok=True)
+        self._output_path.write_text(report.model_dump_json(indent=2))
+
+    def execute(self) -> BenchmarkReport:
+        """Execute all sections with incremental persistence.
+
+        Each section's result is written to disk immediately after
+        completion. If a KeyboardInterrupt occurs, the current state
+        is persisted before returning.
+        """
+        self._results = []
+        self._has_failures = False
+        interrupted = False
+
+        for section_name in SECTION_ORDER:
+            if interrupted:
+                # Mark remaining sections as skipped after interruption
+                self._results.append(
+                    SectionResult(
+                        name=section_name,
+                        status=BenchmarkStatus.SKIPPED,
+                        error="Run interrupted before this section",
+                    )
+                )
+                continue
+
+            if not self._should_run(section_name):
+                self._emit_progress(section_name, "skipped")
+                self._results.append(
+                    SectionResult(
+                        name=section_name,
+                        status=BenchmarkStatus.SKIPPED,
+                    )
+                )
+                self._persist_current_state()
+                continue
+
+            runner = self._runners.get(section_name)
+            if runner is None:
+                self._emit_progress(section_name, "skipped")
+                self._results.append(
+                    SectionResult(
+                        name=section_name,
+                        status=BenchmarkStatus.SKIPPED,
+                        error=f"No runner registered for section '{section_name}'",
+                    )
+                )
+                self._persist_current_state()
+                continue
+
+            # If this is the manifest runner, provide it the accumulated sections
+            if section_name == "manifest" and hasattr(runner, "set_sections"):
+                runner.set_sections(list(self._results))
+
+            self._emit_progress(section_name, "started")
+
+            try:
+                result = runner.run()
+                result.name = section_name
+            except KeyboardInterrupt:
+                now = datetime.now(timezone.utc).isoformat()
+                result = SectionResult(
+                    name=section_name,
+                    status=BenchmarkStatus.FAILED,
+                    started_at=now,
+                    finished_at=now,
+                    error="Run interrupted by user",
+                )
+                interrupted = True
+            except Exception as exc:
+                now = datetime.now(timezone.utc).isoformat()
+                result = SectionResult(
+                    name=section_name,
+                    status=BenchmarkStatus.FAILED,
+                    started_at=now,
+                    finished_at=now,
+                    error=f"Unexpected error: {exc}",
+                )
+
+            self._results.append(result)
+
+            if result.status in (BenchmarkStatus.FAILED, BenchmarkStatus.TIMEOUT):
+                self._has_failures = True
+                status_str = result.status.value
+            else:
+                status_str = "completed"
+
+            self._emit_progress(section_name, status_str)
+
+            # Persist after each section
+            self._persist_current_state()
+
+        return self._build_report()
+
+    def _build_report(self) -> BenchmarkReport:
+        """Build a BenchmarkReport using the pre-assigned report ID."""
+        return BenchmarkReport(
+            schema_version="1.0.0",
+            report_id=self._report_id,
+            created_at=self._created_at,
+            sections=self._results,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Factory: build default section runners
 # ---------------------------------------------------------------------------
 
@@ -236,13 +394,15 @@ class RunOrchestrator:
 def build_section_runners() -> dict[str, SectionRunner]:
     """Build the default set of section runners.
 
-    Uses real runbook runners for pre-flight, compute, memory, and
-    interconnect sections. Post-flight and manifest use stubs pending
-    implementation by a subsequent feature.
+    Uses real runbook runners for all sections: pre-flight, compute,
+    memory, interconnect, monitoring, post-flight, and manifest.
     """
     from ornn_bench.runbook.compute import ComputeMatrixRunner
     from ornn_bench.runbook.interconnect import InterconnectMatrixRunner
+    from ornn_bench.runbook.manifest import ManifestRunner
     from ornn_bench.runbook.memory import MemoryMatrixRunner
+    from ornn_bench.runbook.monitoring import MonitoringRunner
+    from ornn_bench.runbook.postflight import PostflightRunner
     from ornn_bench.runbook.preflight import PreflightRunner
 
     runners: dict[str, SectionRunner] = {
@@ -250,8 +410,8 @@ def build_section_runners() -> dict[str, SectionRunner]:
         "compute": ComputeMatrixRunner(),
         "memory": MemoryMatrixRunner(),
         "interconnect": InterconnectMatrixRunner(),
-        # Post-flight and manifest: stub pending later feature
-        "post-flight": StubSectionRunner("post-flight"),
-        "manifest": StubSectionRunner("manifest"),
+        "monitoring": MonitoringRunner(),
+        "post-flight": PostflightRunner(pre_nvidia_smi_q=""),
+        "manifest": ManifestRunner(),
     }
     return runners

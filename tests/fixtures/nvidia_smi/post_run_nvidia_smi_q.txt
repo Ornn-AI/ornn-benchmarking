@@ -1,0 +1,105 @@
+
+==============NVSMI LOG==============
+
+Timestamp                                 : Thu Jan 15 11:30:00 2024
+Driver Version                            : 535.129.03
+CUDA Version                              : 12.2
+
+Attached GPUs                             : 2
+GPU 00000000:04:00.0
+    Product Name                          : NVIDIA H100 80GB HBM3
+    Product Brand                         : NVIDIA
+    GPU UUID                              : GPU-12345678-abcd-1234-abcd-123456789abc
+    Serial Number                         : 1234567890123
+    GPU Part Number                       : 900-21010-0000-000
+    FB Memory Usage
+        Total                             : 81920 MiB
+        Reserved                          : 512 MiB
+        Used                              : 0 MiB
+        Free                              : 81408 MiB
+    Temperature
+        GPU Current Temp                  : 45 C
+        GPU T.Limit Temp                  : N/A
+        GPU Shutdown T.Limit Temp         : 93 C
+        GPU Slowdown T.Limit Temp         : 90 C
+    Power Readings
+        Power Draw                        : 85.00 W
+        Current Power Limit               : 700.00 W
+    ECC Mode
+        Current                           : Enabled
+        Pending                           : Enabled
+    ECC Errors
+        Volatile
+            SRAM Correctable              : 0
+            SRAM Uncorrectable            : 0
+            DRAM Correctable              : 0
+            DRAM Uncorrectable            : 0
+        Aggregate
+            SRAM Correctable              : 0
+            SRAM Uncorrectable            : 0
+            DRAM Correctable              : 0
+            DRAM Uncorrectable            : 0
+    Retired Pages
+        Single Bit ECC                    : N/A
+        Double Bit ECC                    : N/A
+    Remapped Rows
+        Correctable Error                 : 0
+        Uncorrectable Error               : 0
+        Pending                           : No
+        Remapping Failure Occurred         : No
+    NvLink
+        Link 0
+            State                         : Active
+            Remote GPU UUID               : GPU-87654321-dcba-4321-dcba-cba987654321
+        Link 1
+            State                         : Active
+            Remote GPU UUID               : GPU-87654321-dcba-4321-dcba-cba987654321
+
+GPU 00000000:05:00.0
+    Product Name                          : NVIDIA H100 80GB HBM3
+    Product Brand                         : NVIDIA
+    GPU UUID                              : GPU-87654321-dcba-4321-dcba-cba987654321
+    Serial Number                         : 1234567890124
+    GPU Part Number                       : 900-21010-0000-000
+    FB Memory Usage
+        Total                             : 81920 MiB
+        Reserved                          : 512 MiB
+        Used                              : 0 MiB
+        Free                              : 81408 MiB
+    Temperature
+        GPU Current Temp                  : 46 C
+        GPU T.Limit Temp                  : N/A
+        GPU Shutdown T.Limit Temp         : 93 C
+        GPU Slowdown T.Limit Temp         : 90 C
+    Power Readings
+        Power Draw                        : 84.00 W
+        Current Power Limit               : 700.00 W
+    ECC Mode
+        Current                           : Enabled
+        Pending                           : Enabled
+    ECC Errors
+        Volatile
+            SRAM Correctable              : 0
+            SRAM Uncorrectable            : 0
+            DRAM Correctable              : 0
+            DRAM Uncorrectable            : 0
+        Aggregate
+            SRAM Correctable              : 0
+            SRAM Uncorrectable            : 0
+            DRAM Correctable              : 0
+            DRAM Uncorrectable            : 0
+    Retired Pages
+        Single Bit ECC                    : N/A
+        Double Bit ECC                    : N/A
+    Remapped Rows
+        Correctable Error                 : 0
+        Uncorrectable Error               : 0
+        Pending                           : No
+        Remapping Failure Occurred         : No
+    NvLink
+        Link 0
+            State                         : Active
+            Remote GPU UUID               : GPU-12345678-abcd-1234-abcd-123456789abc
+        Link 1
+            State                         : Active
+            Remote GPU UUID               : GPU-12345678-abcd-1234-abcd-123456789abc
