@@ -17,8 +17,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install only API dependencies (server-side only, no benchmark tools)
+# Copy package metadata and source needed by setuptools to resolve ".[api]"
 COPY pyproject.toml ./
+COPY src/ ./src/
+
+# Install only API dependencies (server-side only, no benchmark tools)
 RUN pip install --no-cache-dir ".[api]"
 
 # Copy API source code

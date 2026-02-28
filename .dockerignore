@@ -21,4 +21,3 @@ docs/
 *.report.json
 ornn_report_*.json
 .factory/
-src/

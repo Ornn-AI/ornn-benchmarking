@@ -1,0 +1,17 @@
+# Cloud Build ignore file
+.git
+.gitignore
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.factory/
+tests/
+docs/
+ornn_report_*.json
+

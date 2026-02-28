@@ -106,10 +106,12 @@ echo ""
 # ---------------------------------------------------------------------------
 # Build and deploy
 # ---------------------------------------------------------------------------
+IMAGE_TAG="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT}/ornn-api/${SERVICE_NAME}:latest"
+
 echo ">>> Building container image..."
 gcloud builds submit \
     --project="${GCP_PROJECT}" \
-    --tag="gcr.io/${GCP_PROJECT}/${SERVICE_NAME}" \
+    --tag="${IMAGE_TAG}" \
     .
 
 echo ""
@@ -117,7 +119,7 @@ echo ">>> Deploying to Cloud Run..."
 gcloud run deploy "${SERVICE_NAME}" \
     --project="${GCP_PROJECT}" \
     --region="${GCP_REGION}" \
-    --image="gcr.io/${GCP_PROJECT}/${SERVICE_NAME}" \
+    --image="${IMAGE_TAG}" \
     --platform="${PLATFORM}" \
     --min-instances="${MIN_INSTANCES}" \
     --max-instances="${MAX_INSTANCES}" \
