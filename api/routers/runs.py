@@ -1,11 +1,17 @@
-"""Router for benchmark run ingest (``POST /api/v1/runs``)."""
+"""Router for benchmark run ingest and retrieval.
+
+Endpoints:
+  - ``POST /api/v1/runs``     — ingest a benchmark run
+  - ``GET  /api/v1/runs/{id}`` — retrieve a stored run by id
+"""
 
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.auth import require_api_key
 from api.dependencies import FirestoreClientProtocol, get_firestore_client
@@ -54,3 +60,28 @@ async def create_run(
         received_at=now,
         stored_at=now,
     )
+
+
+@router.get("/runs/{run_id}")
+async def get_run(
+    run_id: str,
+    api_key: str = _require_api_key,
+    db: FirestoreClientProtocol = _get_firestore_client,
+) -> dict[str, Any]:
+    """Retrieve a stored benchmark run by its id.
+
+    Requires a valid API key.  Returns 404 if the run does not exist.
+    The response body is the full stored document (payload + server fields).
+    """
+    collection = db.collection(COLLECTION_NAME)
+    doc_ref = collection.document(run_id)
+    snapshot = doc_ref.get()
+
+    if not snapshot.exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Run not found.",
+        )
+
+    data: dict[str, Any] = snapshot.to_dict()
+    return data
