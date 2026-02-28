@@ -1,7 +1,7 @@
 """Dependency injection for the Ornn Benchmarking API.
 
-Provides injectable abstractions (Firestore client, settings) that can be
-overridden in tests without touching production wiring.
+Provides injectable abstractions (Firestore client, settings, rate limiter)
+that can be overridden in tests without touching production wiring.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from api.config import Settings, get_settings
+from api.rate_limit import RateLimiter
 
 # ---------------------------------------------------------------------------
 # Firestore client protocol - enables mock / emulator substitution in tests
@@ -33,6 +34,7 @@ class FirestoreClientProtocol(Protocol):
 
 _settings: Settings | None = None
 _firestore_client: FirestoreClientProtocol | None = None
+_rate_limiter: RateLimiter | None = None
 
 
 def get_app_settings() -> Settings:
@@ -71,8 +73,33 @@ def set_firestore_client(client: FirestoreClientProtocol) -> None:
     _firestore_client = client
 
 
+def get_rate_limiter() -> RateLimiter:
+    """Return the rate limiter, creating it lazily on first access.
+
+    Constructs the limiter from :func:`get_app_settings` values.
+    Tests call :func:`set_rate_limiter` to inject a custom instance.
+    """
+    global _rate_limiter
+    if _rate_limiter is None:
+        settings = get_app_settings()
+        _rate_limiter = RateLimiter(
+            max_requests=settings.rate_limit_requests,
+            window_seconds=settings.rate_limit_window_seconds,
+        )
+    return _rate_limiter
+
+
+def set_rate_limiter(limiter: RateLimiter) -> None:
+    """Override the rate limiter (used by tests)."""
+    global _rate_limiter
+    _rate_limiter = limiter
+
+
 def reset_dependencies() -> None:
     """Reset all cached singletons (used between tests)."""
-    global _settings, _firestore_client
+    global _settings, _firestore_client, _rate_limiter
     _settings = None
     _firestore_client = None
+    if _rate_limiter is not None:
+        _rate_limiter.reset()
+    _rate_limiter = None

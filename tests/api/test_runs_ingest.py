@@ -101,12 +101,13 @@ class TestRunIngestSuccess:
         assert isinstance(data["stored_at"], str)
         assert len(data["stored_at"]) > 0
 
-    def test_run_id_is_unique_across_requests(
+    def test_run_id_is_unique_across_distinct_requests(
         self, client: TestClient, auth_headers: dict[str, str]
     ) -> None:
-        """Two successive ingests produce different ``run_id`` values."""
+        """Two successive ingests with distinct payloads produce different ``run_id`` values."""
         r1 = client.post("/api/v1/runs", json=VALID_PAYLOAD, headers=auth_headers).json()
-        r2 = client.post("/api/v1/runs", json=VALID_PAYLOAD, headers=auth_headers).json()
+        different_payload = {**VALID_PAYLOAD, "report_id": "test-run-002"}
+        r2 = client.post("/api/v1/runs", json=different_payload, headers=auth_headers).json()
         assert r1["run_id"] != r2["run_id"]
 
     def test_payload_persisted_in_firestore(

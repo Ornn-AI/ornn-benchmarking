@@ -9,7 +9,8 @@ from typing import Any
 
 import pytest
 from api.auth import reset_api_keys
-from api.dependencies import reset_dependencies, set_firestore_client
+from api.dependencies import reset_dependencies, set_firestore_client, set_rate_limiter
+from api.rate_limit import RateLimiter
 from fastapi.testclient import TestClient
 
 # ---------------------------------------------------------------------------
@@ -37,6 +38,39 @@ class FakeDocumentRef:
         return dict(self._data)
 
 
+class FakeQueryResult:
+    """Minimal fake for a Firestore query result document."""
+
+    def __init__(self, data: dict[str, Any]) -> None:
+        self._data = data
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self._data)
+
+
+class FakeQuery:
+    """Minimal fake for a Firestore query (``where(...).limit(...)``)."""
+
+    def __init__(self, docs: list[FakeDocumentRef], field: str, value: Any) -> None:
+        self._docs = docs
+        self._field = field
+        self._value = value
+        self._limit: int | None = None
+
+    def limit(self, n: int) -> FakeQuery:
+        self._limit = n
+        return self
+
+    def stream(self) -> list[FakeQueryResult]:
+        results: list[FakeQueryResult] = []
+        for doc in self._docs:
+            if doc.exists and doc.to_dict().get(self._field) == self._value:
+                results.append(FakeQueryResult(doc.to_dict()))
+                if self._limit is not None and len(results) >= self._limit:
+                    break
+        return results
+
+
 class FakeCollectionRef:
     """Minimal fake Firestore collection reference."""
 
@@ -49,6 +83,10 @@ class FakeCollectionRef:
         if doc_id not in self._docs:
             self._docs[doc_id] = FakeDocumentRef()
         return self._docs[doc_id]
+
+    def where(self, field: str, op: str, value: Any) -> FakeQuery:
+        """Fake Firestore ``where`` — supports equality only."""
+        return FakeQuery(list(self._docs.values()), field, value)
 
 
 class FakeFirestoreClient:
@@ -83,10 +121,13 @@ def client(fake_firestore: FakeFirestoreClient) -> Generator[TestClient, None, N
 
     Sets up a known API key for authentication tests and resets all
     cached singletons after each test so that no state leaks.
+    Uses a generous rate limit so most tests aren't affected by it.
     """
     reset_dependencies()
     reset_api_keys()
     set_firestore_client(fake_firestore)
+    # Generous rate limit for normal tests — 10 000 requests / 60 s
+    set_rate_limiter(RateLimiter(max_requests=10_000, window_seconds=60))
 
     # Set known API keys for test isolation
     os.environ["ORNN_API_KEYS"] = TEST_API_KEY

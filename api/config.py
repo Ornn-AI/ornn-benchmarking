@@ -29,6 +29,14 @@ class Settings:
     )
     app_version: str = "0.1.0"
 
+    # Rate limiting (per API key)
+    rate_limit_requests: int = field(
+        default_factory=lambda: int(os.environ.get("RATE_LIMIT_REQUESTS", "60"))
+    )
+    rate_limit_window_seconds: int = field(
+        default_factory=lambda: int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "60"))
+    )
+
     # Server
     port: int = field(
         default_factory=lambda: int(os.environ.get("PORT", "8080"))
