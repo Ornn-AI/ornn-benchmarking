@@ -1,7 +1,10 @@
-"""Scorecard display for terminal output.
+"""Scorecard and report display for terminal output.
 
 Provides Rich-formatted scorecard rendering with Ornn-I, Ornn-T,
 component metrics, qualification badges, and score status (VAL-CLI-007).
+
+Also provides plain-text and JSON output renderers for non-TTY / piped
+output modes (VAL-CLI-008, VAL-CLI-011).
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from rich.table import Table
 from rich.text import Text
 
 from ornn_bench.models import (
+    BenchmarkReport,
     Qualification,
     ScoreResult,
     ScoreStatus,
@@ -188,3 +192,31 @@ def _format_plain_score(value: float | None) -> str:
     if value is None:
         return "N/A"
     return f"{value:.1f}"
+
+
+def render_report_plain(report: BenchmarkReport) -> str:
+    """Render a full report as plain text for non-TTY / piped output.
+
+    Returns a clean string representation without ANSI codes or
+    box-drawing characters (VAL-CLI-008, VAL-CLI-011).
+    """
+    lines: list[str] = []
+
+    # --- Report metadata ---
+    lines.append("=== Report Metadata ===")
+    lines.append(f"  Report ID: {report.report_id}")
+    lines.append(f"  Created: {report.created_at}")
+    lines.append(f"  Schema Version: {report.schema_version}")
+    lines.append("")
+
+    # --- Section summary ---
+    if report.sections:
+        lines.append("=== Sections ===")
+        for section in report.sections:
+            lines.append(f"  {section.name}: {section.status.value}")
+        lines.append("")
+
+    # --- Scorecard ---
+    lines.append(render_scorecard_plain(report.scores))
+
+    return "\n".join(lines)

@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from ornn_bench import __version__
-from ornn_bench.display import render_scorecard
+from ornn_bench.display import render_report_plain, render_scorecard
 from ornn_bench.models import BenchmarkReport
 from ornn_bench.runner import RunOrchestrator, build_section_runners
 from ornn_bench.system import check_gpu_available, collect_environment_info
@@ -269,22 +269,61 @@ def report(
         Path,
         typer.Argument(help="Path to a JSON report file to display."),
     ],
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Output the report as machine-readable JSON (no ANSI, no progress).",
+        ),
+    ] = False,
+    plain: Annotated[
+        bool,
+        typer.Option(
+            "--plain",
+            help="Output the report as plain text (no ANSI codes or box-drawing).",
+        ),
+    ] = False,
 ) -> None:
     """Re-render a previously saved benchmark report.
 
     Reads the JSON report file and displays the scorecard in the terminal.
     Works on machines without GPU tools installed.
+
+    Use --json for machine-readable JSON output (piped/non-TTY safe).
+    Use --plain for clean text output without ANSI codes.
     """
     if not report_file.exists():
-        console.print(f"[red]Error:[/red] Report file not found: {report_file}")
+        if json_output:
+            typer.echo('{"error": "Report file not found"}')
+        elif plain:
+            typer.echo(f"Error: Report file not found: {report_file}")
+        else:
+            console.print(f"[red]Error:[/red] Report file not found: {report_file}")
         raise typer.Exit(code=1)
 
     try:
         raw = report_file.read_text()
         bench_report = BenchmarkReport.model_validate_json(raw)
     except Exception as exc:
-        console.print(f"[red]Error:[/red] Failed to parse report: {exc}")
+        if json_output:
+            typer.echo(f'{{"error": "Failed to parse report: {exc}"}}')
+        elif plain:
+            typer.echo(f"Error: Failed to parse report: {exc}")
+        else:
+            console.print(f"[red]Error:[/red] Failed to parse report: {exc}")
         raise typer.Exit(code=1) from None
+
+    # --- JSON output mode (VAL-CLI-011) ---
+    if json_output:
+        typer.echo(bench_report.model_dump_json(indent=2))
+        return
+
+    # --- Plain text output mode (VAL-CLI-011) ---
+    if plain:
+        typer.echo(render_report_plain(bench_report))
+        return
+
+    # --- Rich terminal output (default) ---
 
     # Display report metadata
     meta_table = Table(show_header=False, box=None, padding=(0, 2))

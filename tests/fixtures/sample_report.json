@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0.0",
+  "report_id": "test-report-fixture-001",
+  "created_at": "2024-01-15T10:30:00Z",
+  "system_inventory": {
+    "gpus": [
+      {
+        "uuid": "GPU-12345678-abcd-1234-abcd-123456789abc",
+        "name": "NVIDIA H100 80GB HBM3",
+        "driver_version": "535.129.03",
+        "cuda_version": "12.2",
+        "memory_total_mb": 81920
+      }
+    ],
+    "os_info": "Ubuntu 22.04.3 LTS",
+    "kernel_version": "5.15.0-91-generic",
+    "cpu_model": "Intel(R) Xeon(R) Platinum 8480+",
+    "numa_nodes": 2,
+    "pytorch_version": "2.1.2"
+  },
+  "sections": [
+    {
+      "name": "pre-flight",
+      "status": "completed",
+      "started_at": "2024-01-15T10:30:00Z",
+      "finished_at": "2024-01-15T10:30:05Z",
+      "metrics": {},
+      "error": null
+    },
+    {
+      "name": "compute",
+      "status": "completed",
+      "started_at": "2024-01-15T10:30:05Z",
+      "finished_at": "2024-01-15T10:35:00Z",
+      "metrics": {},
+      "error": null
+    },
+    {
+      "name": "memory",
+      "status": "completed",
+      "started_at": "2024-01-15T10:35:00Z",
+      "finished_at": "2024-01-15T10:40:00Z",
+      "metrics": {},
+      "error": null
+    },
+    {
+      "name": "interconnect",
+      "status": "completed",
+      "started_at": "2024-01-15T10:40:00Z",
+      "finished_at": "2024-01-15T10:45:00Z",
+      "metrics": {},
+      "error": null
+    },
+    {
+      "name": "monitoring",
+      "status": "completed",
+      "started_at": "2024-01-15T10:30:05Z",
+      "finished_at": "2024-01-15T10:45:00Z",
+      "metrics": {},
+      "error": null
+    },
+    {
+      "name": "post-flight",
+      "status": "completed",
+      "started_at": "2024-01-15T10:45:00Z",
+      "finished_at": "2024-01-15T10:45:30Z",
+      "metrics": {},
+      "error": null
+    },
+    {
+      "name": "manifest",
+      "status": "completed",
+      "started_at": "2024-01-15T10:45:30Z",
+      "finished_at": "2024-01-15T10:45:31Z",
+      "metrics": {},
+      "error": null
+    }
+  ],
+  "scores": {
+    "ornn_i": 92.5,
+    "ornn_t": 88.3,
+    "qualification": "Premium",
+    "components": {
+      "bw": 1.25,
+      "fp8": 0.95,
+      "bf16": 1.1,
+      "ar": 0.85
+    },
+    "score_status": "valid",
+    "score_status_detail": null,
+    "aggregate_method": null,
+    "per_gpu_scores": []
+  },
+  "manifest": {}
+}
