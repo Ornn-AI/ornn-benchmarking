@@ -33,6 +33,7 @@ Thumbs.db
 
 # Reports (generated at runtime)
 *.report.json
+ornn_report_*.json
 
 # Environment
 .env

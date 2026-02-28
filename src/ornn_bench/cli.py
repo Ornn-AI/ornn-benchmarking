@@ -15,6 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from ornn_bench import __version__
+from ornn_bench.runner import RunOrchestrator, build_section_runners
 from ornn_bench.system import check_gpu_available, collect_environment_info
 
 console = Console()
@@ -104,9 +105,73 @@ def run(
         )
         raise typer.Exit(code=1)
 
-    # GPU is present — benchmark orchestration not yet implemented.
-    typer.echo("Benchmark run is not yet implemented.")
-    raise typer.Exit(code=1)
+    # Determine scope from flags
+    scope: set[str] | None = None
+    scope_flags = {
+        "compute": compute_only,
+        "memory": memory_only,
+        "interconnect": interconnect_only,
+    }
+    active_scopes = {name for name, flag in scope_flags.items() if flag}
+    if active_scopes:
+        scope = active_scopes
+
+    # Build runners and orchestrator
+    runners = build_section_runners()
+
+    def _on_progress(section: str, status: str) -> None:
+        if status == "started":
+            console.print(f"  [bold]▶[/bold] Running [cyan]{section}[/cyan]...")
+        elif status == "completed":
+            console.print(f"  [green]✓[/green] {section} [green]completed[/green]")
+        elif status == "skipped":
+            console.print(f"  [dim]-[/dim] {section} [dim]skipped[/dim]")
+        elif status == "failed":
+            console.print(f"  [red]✗[/red] {section} [red]failed[/red]")
+        elif status == "timeout":
+            console.print(f"  [yellow]⏱[/yellow] {section} [yellow]timed out[/yellow]")
+
+    console.print(Panel("[bold]Starting benchmark run[/bold]", border_style="blue"))
+
+    orch = RunOrchestrator(runners=runners, scope=scope, on_progress=_on_progress)
+    report = orch.execute()
+
+    # Write JSON report
+    if output is None:
+        output = Path(f"ornn_report_{report.report_id[:8]}.json")
+    output.write_text(report.model_dump_json(indent=2))
+    console.print(f"\n  Report saved to [bold]{output}[/bold]")
+
+    # Summary
+    total = len(report.sections)
+    completed = sum(1 for s in report.sections if s.status.value == "completed")
+    failed = sum(1 for s in report.sections if s.status.value in ("failed", "timeout"))
+    skipped = sum(1 for s in report.sections if s.status.value == "skipped")
+
+    summary_parts = [f"[green]{completed} completed[/green]"]
+    if failed:
+        summary_parts.append(f"[red]{failed} failed[/red]")
+    if skipped:
+        summary_parts.append(f"[dim]{skipped} skipped[/dim]")
+    console.print(f"\n  {' · '.join(summary_parts)} of {total} sections\n")
+
+    if orch.has_failures:
+        console.print(
+            Panel(
+                "[yellow]Some sections failed. Review the report for details.[/yellow]",
+                title="[bold yellow]Partial Failure[/bold yellow]",
+                border_style="yellow",
+            )
+        )
+        raise typer.Exit(code=2)
+
+    console.print(
+        Panel(
+            "[green]All sections completed successfully.[/green]",
+            title="[bold green]Run Complete[/bold green]",
+            border_style="green",
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
