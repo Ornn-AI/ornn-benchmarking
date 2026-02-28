@@ -1,0 +1,13 @@
+{
+  "group": "cli-install",
+  "assertions": {
+    "VAL-CLI-001": {
+      "status": "pass",
+      "evidence": "pip install -e '.[dev]' succeeded with exit code 0 (Successfully installed ornn-bench-0.1.0). ornn-bench --version returned 'ornn-bench 0.1.0' with exit code 0, no traceback. pyproject.toml defines [project.scripts] ornn-bench = 'ornn_bench.cli:app_entry'. pip show reports Name: ornn-bench, Version: 0.1.0, License: MIT.",
+      "details": "All four verification steps passed: (1) pip install -e '.[dev]' completed without errors, (2) .venv/bin/ornn-bench --version printed 'ornn-bench 0.1.0' (valid semver) with exit code 0 and no Python traceback, (3) pyproject.toml has correct console_scripts entry pointing to ornn_bench.cli:app_entry, (4) pip show confirms package metadata (name, version 0.1.0, summary, MIT license, correct dependencies). No console errors observed."
+    }
+  },
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["Execute"]
+}

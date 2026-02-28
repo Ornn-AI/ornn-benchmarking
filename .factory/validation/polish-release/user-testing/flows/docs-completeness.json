@@ -1,0 +1,39 @@
+{
+  "group": "docs-completeness",
+  "assertions": {
+    "VAL-DOCS-001": {
+      "status": "pass",
+      "evidence": "File exists at /Users/kushbavaria/ornn-benchmarking/README.md. Content review confirms: project overview ('A standardized GPU benchmarking framework...'), quick-start installation ('pip install ornn-bench'), usage examples for all 4 commands (run, info, report, upload), and a Documentation table linking to cli-usage.md, api-reference.md, deployment.md, architecture.md, and CONTRIBUTING.md.",
+      "details": "README includes Features section, Quick Start with install+examples, Scoring explanation with formulas and qualification grades, Requirements, Documentation links table, and Development setup instructions. All required sections present and thorough."
+    },
+    "VAL-DOCS-002": {
+      "status": "pass",
+      "evidence": "File exists at /Users/kushbavaria/ornn-benchmarking/docs/api-reference.md. Content review confirms: all 3 endpoints documented (POST /api/v1/runs, GET /api/v1/runs/{run_id}, POST /api/v1/verify), plus GET /health. Full request/response schemas with JSON examples, authentication via X-API-Key header with key management details, error codes table (200, 201, 401, 404, 422, 429), rate limiting section with defaults and env vars, idempotent ingest explanation, and client configuration.",
+      "details": "API reference is comprehensive: Authentication section covers key management and error responses. Each endpoint has headers, request body schemas, response examples (including duplicate/mismatch scenarios for POST /runs and POST /verify). Request/Response Schemas section details SystemInventory, GPUInfo, ScorePayload, and SectionPayload models. Error codes table covers all HTTP statuses. Rate limiting documents per-key sliding window with configurable parameters. Schema version errors and validation errors documented with example responses."
+    },
+    "VAL-DOCS-003": {
+      "status": "pass",
+      "evidence": "File exists at /Users/kushbavaria/ornn-benchmarking/docs/deployment.md. Content review confirms: prerequisites (GCP project, enable APIs, Firestore init, local tools), GCP project setup with gcloud commands, environment variables table (FIRESTORE_PROJECT_ID, PORT, RATE_LIMIT_REQUESTS, etc.), gcloud deployment commands (quick deploy via deploy.sh, custom deploy, manual deploy with gcloud builds submit + gcloud run deploy), Firestore configuration (native mode, us-east1), and post-deploy verification (health check curl, gcloud run services describe).",
+      "details": "Deployment guide covers: Architecture overview with cost table, prerequisites (GCP setup + local tools), 3 deployment methods (quick/custom/manual), environment variables, post-deploy verification steps, 4 local development options (direct Python, Firestore emulator with Java prerequisite, mock fallback for tests, Docker), troubleshooting table, and free-tier compliance verification commands."
+    },
+    "VAL-DOCS-004": {
+      "status": "pass",
+      "evidence": "File exists at /Users/kushbavaria/ornn-benchmarking/docs/cli-usage.md. Content review confirms: installation ('pip install ornn-bench'), all 4 commands documented (run, info, report, upload) with options tables, flags (--compute-only, --memory-only, --interconnect-only, --output, --upload, --api-key, --json, --plain, --verify/--no-verify), output formats (Rich terminal, JSON, plain text), multiple examples per command, and troubleshooting section with 6 common issues.",
+      "details": "CLI guide is thorough: Installation with version verification, --help output, run command with options table + execution order + exit codes + partial failure behavior, info command with example output for no-GPU scenario, report command with 3 output modes explained, upload command with pre-upload validation + error messages table + retry safety note, environment variables table, JSON report format example, terminal scorecard description, and troubleshooting for GPU detection, missing tools, auth failures, rate limits, partial failures, and ANSI codes in piped output."
+    },
+    "VAL-DOCS-005": {
+      "status": "pass",
+      "evidence": "File exists at /Users/kushbavaria/ornn-benchmarking/docs/architecture.md. Content review confirms: system components (CLI ornn-bench, FastAPI Backend on Cloud Run, Firestore) with module-level breakdown tables, data flow diagrams (benchmark execution flow + upload flow with ASCII art), scoring pipeline (formulas, multi-GPU aggregation, score status, edge cases), benchmark execution model (section runners, scope filtering, partial failure semantics), and deployment topology (ASCII diagram showing Cloud Run + Firestore in GCP with free-tier design).",
+      "details": "Architecture doc covers: System overview with 3 components and ASCII diagram, CLI module table (8 modules), API module table (10 modules), Firestore collection structure, benchmark execution flow (7-step pipeline), upload flow (sequence diagram), scoring pipeline with formulas + multi-GPU minimum aggregation + score status tracking + edge case handling, benchmark execution model with section runners interface + external tools table + scope filtering + partial failure semantics, deployment topology with detailed ASCII diagram + free-tier cost table, full project structure tree, and technology stack table (12 technologies)."
+    },
+    "VAL-DOCS-006": {
+      "status": "pass",
+      "evidence": "File exists at /Users/kushbavaria/ornn-benchmarking/CONTRIBUTING.md. Content review confirms: development setup (prerequisites, clone, venv, pip install -e '.[dev]', verify installation), code style (Ruff linter/formatter with config details, mypy type checking, coding conventions list), testing (running tests with multiple examples, test organization tree, writing tests guidelines, test fixtures), PR process (5-step workflow: branch, changes, verify, commit with conventional commits, open PR), and issue reporting (required fields: OS, Python version, ornn-bench version, GPU info, steps, expected/actual, error output).",
+      "details": "Contributing guide is comprehensive: Development setup with prerequisites (Python 3.10+, Git, no GPU needed) and full clone-to-verify workflow. Code style covers Ruff config, mypy strict mode, and 7 coding conventions. Testing section has running commands, test directory organization, 4 writing-test guidelines, and fixture usage. PR workflow is 5 clear steps with conventional commits format and prefix examples. Issue reporting template with 7 required fields. Additional sections on architecture decisions and local API development."
+    }
+  },
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["Read", "Glob"],
+  "summary": "Tested 6 assertions: all 6 passed. All documentation files exist and contain comprehensive coverage of their required sections."
+}

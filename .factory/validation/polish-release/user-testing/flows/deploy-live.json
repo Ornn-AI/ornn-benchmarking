@@ -1,0 +1,80 @@
+{
+  "group": "deploy-live",
+  "testedAt": "2026-02-28T06:30:00Z",
+  "credentials": {
+    "account": "dev-test-key",
+    "namespace": "deploy-val-"
+  },
+  "toolsUsed": ["Execute", "Read"],
+  "assertions": {
+    "VAL-DEPLOY-001": {
+      "status": "pass",
+      "evidence": "gcloud run services describe confirms service 'ornn-api' deployed in project 'ornn-benchmarking' region 'us-east1', status Ready=True. curl GET /health returned HTTP 200 with body {\"status\":\"ok\",\"version\":\"0.1.0\",\"service\":\"Ornn Benchmarking API\"}.",
+      "details": "Service URL: https://ornn-api-jt6edideba-ue.a.run.app. Created at 2026-02-28T05:58:08Z. Latest revision: ornn-api-00002-5d4. All status conditions True (Ready, ConfigurationsReady, RoutesReady).",
+      "steps": [
+        {"action": "gcloud run services describe ornn-api --project=ornn-benchmarking --region=us-east1 --format=yaml", "expected": "Service exists and is Ready", "observed": "Service exists, status Ready=True, latestReadyRevisionName=ornn-api-00002-5d4"},
+        {"action": "curl -s https://ornn-api-jt6edideba-ue.a.run.app/health", "expected": "HTTP 200", "observed": "HTTP 200, body: {\"status\":\"ok\",\"version\":\"0.1.0\",\"service\":\"Ornn Benchmarking API\"}"}
+      ]
+    },
+    "VAL-DEPLOY-002": {
+      "status": "pass",
+      "evidence": "POST /api/v1/runs with X-API-Key: dev-test-key returned HTTP 201 with body {\"run_id\":\"53fa7dcc0d414d729d4e866cf508938a\",\"received_at\":\"2026-02-28T06:29:53.937651+00:00\",\"stored_at\":\"2026-02-28T06:29:53.937651+00:00\"}.",
+      "details": "Submitted test payload with report_id 'deploy-val-001' containing schema_version 1.0.0, system_inventory, scores, and empty sections/manifest. Received run_id and server timestamps confirming persistence.",
+      "steps": [
+        {"action": "POST /api/v1/runs with valid API key and test payload", "expected": "HTTP 201 with run_id", "observed": "HTTP 201, run_id=53fa7dcc0d414d729d4e866cf508938a"}
+      ]
+    },
+    "VAL-DEPLOY-003": {
+      "status": "pass",
+      "evidence": "POST without API key returned HTTP 401 {\"detail\":\"Missing API key. Provide a valid key via the X-API-Key header.\"}. POST with invalid key (X-API-Key: invalid-key-xyz) returned HTTP 401 {\"detail\":\"Unauthorized.\"}.",
+      "details": "Both missing and invalid API key scenarios correctly rejected with 401. No sensitive internal details leaked in response bodies.",
+      "steps": [
+        {"action": "POST /api/v1/runs without X-API-Key header", "expected": "HTTP 401", "observed": "HTTP 401, detail: Missing API key message"},
+        {"action": "POST /api/v1/runs with X-API-Key: invalid-key-xyz", "expected": "HTTP 401", "observed": "HTTP 401, detail: Unauthorized"}
+      ]
+    },
+    "VAL-DEPLOY-004": {
+      "status": "pass",
+      "evidence": "GET /api/v1/runs/53fa7dcc0d414d729d4e866cf508938a with valid API key returned HTTP 200. Response payload matches submitted data: report_id=deploy-val-001, schema_version=1.0.0, scores.ornn_i=100.0, scores.ornn_t=100.0, scores.qualification=Premium, system_inventory.gpus[0].name=Test GPU.",
+      "details": "Round-trip verified: all submitted fields present in retrieval response. Server added run_id, received_at, stored_at, and dedupe_key fields.",
+      "steps": [
+        {"action": "GET /api/v1/runs/53fa7dcc0d414d729d4e866cf508938a with X-API-Key: dev-test-key", "expected": "HTTP 200 with matching payload", "observed": "HTTP 200, payload matches submitted data with server-added fields"}
+      ]
+    },
+    "VAL-DEPLOY-005": {
+      "status": "pass",
+      "evidence": "1) Run submitted in VAL-DEPLOY-002 was successfully retrieved in VAL-DEPLOY-004, proving persistence across requests. 2) gcloud env check confirms FIRESTORE_PROJECT_ID=ornn-benchmarking is set as container env var, confirming Firestore is the storage backend. 3) deploy.sh sets --set-env-vars=FIRESTORE_PROJECT_ID=${GCP_PROJECT} in the gcloud run deploy command.",
+      "details": "Firestore persistence confirmed through: successful round-trip retrieval of submitted run, FIRESTORE_PROJECT_ID env var set on the live service, and deploy.sh configuration using Firestore as sole database.",
+      "steps": [
+        {"action": "Verify retrieval of submitted run (from VAL-DEPLOY-004)", "expected": "Data persisted and retrievable", "observed": "Run successfully retrieved with all original fields"},
+        {"action": "gcloud run services describe --format env check", "expected": "FIRESTORE_PROJECT_ID set", "observed": "FIRESTORE_PROJECT_ID=ornn-benchmarking confirmed"},
+        {"action": "Review deploy.sh Firestore config", "expected": "Firestore env var set in deployment", "observed": "--set-env-vars=FIRESTORE_PROJECT_ID=${GCP_PROJECT} in deploy command"}
+      ]
+    },
+    "VAL-DEPLOY-006": {
+      "status": "pass",
+      "evidence": "gcloud run services describe shows: no minScale annotation (defaults to 0 = scale-to-zero), maxScale=2, memory=256Mi, cpu=1. deploy.sh explicitly sets MIN_INSTANCES=0 with comment 'Scale-to-zero: no cost when idle'. Dockerfile uses only python:3.12-slim + pip install. services.yaml lists only Cloud Run (api) and Firestore emulator. No VMs, Cloud SQL, GKE, or other paid always-on infrastructure in any config.",
+      "details": "Free-tier-safe configuration confirmed: Cloud Run with scale-to-zero (min-instances=0), Firestore as only database, no always-on infrastructure. deploy.sh header explicitly states 'Free-tier-safe defaults' and documents constraints.",
+      "steps": [
+        {"action": "Check min-instances in gcloud describe output", "expected": "No minScale annotation or minScale=0", "observed": "No autoscaling.knative.dev/minScale annotation present (defaults to 0)"},
+        {"action": "Review deploy.sh for infrastructure config", "expected": "Only Cloud Run + Firestore, no VMs/SQL/GKE", "observed": "MIN_INSTANCES=0, only gcloud run deploy + Firestore env var, no other infra"},
+        {"action": "Review Dockerfile for dependencies", "expected": "Minimal container, no extra services", "observed": "python:3.12-slim, pip install .[api], uvicorn only"},
+        {"action": "Review services.yaml", "expected": "Only Cloud Run + Firestore", "observed": "Only api (port 8080) and firestore-emulator (port 8085) listed"}
+      ]
+    },
+    "VAL-CROSS-004": {
+      "status": "pass",
+      "evidence": "Default deployment path (deploy.sh) uses only: 1) Cloud Run managed platform with --min-instances=0 (scale-to-zero), 2) Firestore native mode as sole database (FIRESTORE_PROJECT_ID env var). No VMs, Cloud SQL, GKE, Redis, or other always-on paid infrastructure. services.yaml confirms only Cloud Run API + Firestore emulator for local dev. Dockerfile contains no references to external paid services.",
+      "details": "Free-tier-safe baseline confirmed across all config files: deploy.sh (Cloud Run + Firestore only), Dockerfile (minimal Python container), services.yaml (only 2 services: api on 8080, firestore-emulator on 8085). deploy.sh header explicitly documents free-tier-safe design intent.",
+      "steps": [
+        {"action": "Review deploy.sh deployment commands", "expected": "Only Cloud Run + Firestore", "observed": "gcloud run deploy with --min-instances=0, --set-env-vars=FIRESTORE_PROJECT_ID only"},
+        {"action": "Review services.yaml manifest", "expected": "No paid always-on services", "observed": "Only api (Cloud Run) and firestore-emulator listed"},
+        {"action": "Review Dockerfile", "expected": "No external paid service dependencies", "observed": "Only python:3.12-slim + pip install .[api] + uvicorn"},
+        {"action": "Verify gcloud describe output for paid infra", "expected": "No always-on instances", "observed": "No minScale annotation (defaults to 0), maxScale=2, managed platform"}
+      ]
+    }
+  },
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 7 assertions: all 7 passed. Live Cloud Run service is deployed and reachable (VAL-DEPLOY-001), accepts authenticated submissions returning 201 (VAL-DEPLOY-002), rejects missing/invalid API keys with 401 (VAL-DEPLOY-003), supports retrieval round-trip with payload matching (VAL-DEPLOY-004), persists data in Firestore (VAL-DEPLOY-005), and uses free-tier-safe scale-to-zero configuration with no always-on paid infrastructure (VAL-DEPLOY-006, VAL-CROSS-004)."
+}
