@@ -154,15 +154,18 @@ class TestIdempotentIngestDifferentPayloads:
         r2 = client.post("/api/v1/runs", json=different, headers=auth_headers).json()
         assert r1["run_id"] != r2["run_id"]
 
-    def test_different_schema_version_creates_new_run(
+    def test_unsupported_schema_version_is_rejected(
         self, client: TestClient, auth_headers: dict[str, str]
     ) -> None:
-        """Different ``schema_version`` creates a separate run."""
-        r1 = client.post("/api/v1/runs", json=VALID_PAYLOAD, headers=auth_headers).json()
+        """Unsupported ``schema_version`` is rejected with 422 (VAL-CROSS-005)."""
+        r1 = client.post("/api/v1/runs", json=VALID_PAYLOAD, headers=auth_headers)
+        assert r1.status_code == 201
 
         different = {**VALID_PAYLOAD, "schema_version": "2.0.0"}
-        r2 = client.post("/api/v1/runs", json=different, headers=auth_headers).json()
-        assert r1["run_id"] != r2["run_id"]
+        r2 = client.post("/api/v1/runs", json=different, headers=auth_headers)
+        assert r2.status_code == 422
+        detail = r2.json().get("detail", "")
+        assert "schema version" in detail.lower() or "2.0.0" in detail
 
     def test_both_distinct_runs_stored_in_firestore(
         self,

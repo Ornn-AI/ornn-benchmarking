@@ -28,6 +28,10 @@ router = APIRouter(prefix="/api/v1", tags=["runs"])
 
 COLLECTION_NAME = "benchmark_runs"
 
+# Supported schema versions — unsupported versions are rejected with 422
+# and explicit upgrade/downgrade guidance (VAL-CROSS-005).
+SUPPORTED_SCHEMA_VERSIONS = {"1.0.0"}
+
 _require_api_key = Depends(require_api_key)
 _get_firestore_client = Depends(get_firestore_client)
 _get_rate_limiter = Depends(get_rate_limiter)
@@ -91,6 +95,18 @@ async def create_run(
     ``schema_version``) has already been ingested, returns the existing
     ``run_id`` with HTTP 200 instead of creating a duplicate.
     """
+    # --- Schema version check (VAL-CROSS-005) --------------------------
+    if payload.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+        supported = ", ".join(sorted(SUPPORTED_SCHEMA_VERSIONS))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Unsupported schema version '{payload.schema_version}'. "
+                f"Supported versions: {supported}. "
+                f"Please upgrade or downgrade ornn-bench to a compatible version."
+            ),
+        )
+
     # --- Rate limiting --------------------------------------------------
     allowed, retry_after = limiter.check(api_key)
     if not allowed:

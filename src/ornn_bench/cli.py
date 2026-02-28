@@ -6,6 +6,7 @@ Provides the Typer-based command hierarchy with ``run``, ``info``,
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Annotated
 
@@ -15,12 +16,194 @@ from rich.panel import Panel
 from rich.table import Table
 
 from ornn_bench import __version__
+from ornn_bench.api_client import (
+    AuthenticationError,
+    NetworkError,
+    OrnnApiClient,
+    RateLimitError,
+    SchemaVersionError,
+    UploadError,
+    UploadResult,
+    ValidationError,
+    VerifyResult,
+    validate_report_for_upload,
+)
 from ornn_bench.display import render_report_plain, render_scorecard
 from ornn_bench.models import BenchmarkReport
 from ornn_bench.runner import RunOrchestrator, build_section_runners
 from ornn_bench.system import check_gpu_available, collect_environment_info
 
 console = Console()
+
+# Default API URL — can be overridden via ORNN_API_URL env var
+DEFAULT_API_URL = "https://ornn-benchmarking-api.run.app"
+
+
+# ---------------------------------------------------------------------------
+# Upload / verify helpers
+# ---------------------------------------------------------------------------
+
+
+def _get_api_url() -> str:
+    """Get the API URL from environment or default."""
+    return os.environ.get("ORNN_API_URL", DEFAULT_API_URL)
+
+
+def _perform_upload(
+    report: BenchmarkReport,
+    api_key: str,
+    console: Console,
+) -> UploadResult | None:
+    """Upload a report and display the result.
+
+    Returns the UploadResult on success, None on failure.
+    Handles all error types with clear user-facing messages.
+    """
+    client = OrnnApiClient(api_url=_get_api_url(), api_key=api_key)
+
+    try:
+        result = client.upload(report)
+    except SchemaVersionError as exc:
+        console.print(
+            Panel(
+                f"[red]{exc}[/red]",
+                title="[bold red]Schema Version Error[/bold red]",
+                border_style="red",
+            )
+        )
+        return None
+    except AuthenticationError as exc:
+        console.print(
+            Panel(
+                f"[red]{exc}[/red]\n\n"
+                "[dim]Check your API key via --api-key or ORNN_API_KEY env var.[/dim]",
+                title="[bold red]Authentication Error[/bold red]",
+                border_style="red",
+            )
+        )
+        return None
+    except ValidationError as exc:
+        console.print(
+            Panel(
+                f"[red]{exc}[/red]",
+                title="[bold red]Validation Error[/bold red]",
+                border_style="red",
+            )
+        )
+        return None
+    except RateLimitError as exc:
+        retry_msg = ""
+        if exc.retry_after:
+            retry_msg = f"\n\n[dim]Retry after {exc.retry_after} seconds.[/dim]"
+        console.print(
+            Panel(
+                f"[yellow]{exc}[/yellow]{retry_msg}",
+                title="[bold yellow]Rate Limit Exceeded[/bold yellow]",
+                border_style="yellow",
+            )
+        )
+        return None
+    except NetworkError as exc:
+        console.print(
+            Panel(
+                f"[red]{exc}[/red]\n\n"
+                "[dim]Check your network connection and try again. "
+                "Retrying is safe — duplicates are automatically prevented.[/dim]",
+                title="[bold red]Network Error[/bold red]",
+                border_style="red",
+            )
+        )
+        return None
+    except UploadError as exc:
+        console.print(
+            Panel(
+                f"[red]{exc}[/red]",
+                title="[bold red]Upload Error[/bold red]",
+                border_style="red",
+            )
+        )
+        return None
+
+    # Success display
+    if result.is_duplicate:
+        console.print(
+            Panel(
+                f"[yellow]Report already uploaded.[/yellow]\n"
+                f"  Run ID: [bold]{result.run_id}[/bold]\n"
+                f"  Received: {result.received_at}",
+                title="[bold yellow]Duplicate Detected[/bold yellow]",
+                border_style="yellow",
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                f"[green]Report uploaded successfully.[/green]\n"
+                f"  Run ID: [bold]{result.run_id}[/bold]\n"
+                f"  Stored: {result.stored_at}",
+                title="[bold green]Upload Complete[/bold green]",
+                border_style="green",
+            )
+        )
+
+    return result
+
+
+def _perform_verify(
+    report: BenchmarkReport,
+    api_key: str,
+    console: Console,
+) -> VerifyResult | None:
+    """Verify local scores against server recomputation and display results.
+
+    Returns the VerifyResult on success, None on failure.
+    """
+    client = OrnnApiClient(api_url=_get_api_url(), api_key=api_key)
+
+    try:
+        result = client.verify(report)
+    except UploadError as exc:
+        console.print(
+            f"  [dim]Score verification skipped: {exc}[/dim]"
+        )
+        return None
+
+    # Display verification result
+    if result.status == "verified":
+        console.print(
+            Panel(
+                "[green]Local and server scores match.[/green]\n"
+                f"  Tolerance: ±{result.tolerance}",
+                title="[bold green]Score Verification: Verified ✓[/bold green]",
+                border_style="green",
+            )
+        )
+    else:
+        # Build mismatch detail table
+        detail_table = Table(show_header=True, padding=(0, 2))
+        detail_table.add_column("Metric", style="bold")
+        detail_table.add_column("Local", justify="right")
+        detail_table.add_column("Server", justify="right")
+        detail_table.add_column("Match", justify="center")
+        detail_table.add_column("Delta", justify="right")
+
+        for d in result.metric_details:
+            local_val = f"{d.submitted:.2f}" if d.submitted is not None else "N/A"
+            server_val = f"{d.server_computed:.2f}" if d.server_computed is not None else "N/A"
+            match_str = "[green]✓[/green]" if d.match else "[red]✗[/red]"
+            delta_str = f"{d.delta:.4f}" if d.delta is not None else "—"
+            detail_table.add_row(d.metric, local_val, server_val, match_str, delta_str)
+
+        console.print(
+            Panel(
+                detail_table,
+                title="[bold yellow]Score Verification: Mismatch ✗[/bold yellow]",
+                border_style="yellow",
+            )
+        )
+
+    return result
+
 
 # ---------------------------------------------------------------------------
 # Version callback
@@ -88,6 +271,14 @@ def run(
         bool,
         typer.Option("--upload", help="Upload results to the Ornn API after the run."),
     ] = False,
+    api_key: Annotated[
+        str | None,
+        typer.Option(
+            "--api-key",
+            help="API key for upload. Can also be set via ORNN_API_KEY env var.",
+            envvar="ORNN_API_KEY",
+        ),
+    ] = None,
 ) -> None:
     """Run the full GPU benchmark suite (or selected sections).
 
@@ -95,6 +286,7 @@ def run(
     and Ornn-T scores, displays a scorecard, and writes a JSON report.
 
     Use scope flags to run only a subset of benchmarks.
+    Use --upload to post results to the Ornn API (requires --api-key or ORNN_API_KEY).
     """
     gpu_available, gpu_message = check_gpu_available()
     if not gpu_available:
@@ -159,6 +351,30 @@ def run(
 
     # Display scorecard (VAL-CLI-007)
     render_scorecard(report.scores, console=console)
+
+    # --- Upload flow (VAL-CROSS-001) ---
+    if upload:
+        if not api_key:
+            console.print(
+                Panel(
+                    "[red]API key required for upload.[/red]\n\n"
+                    "[dim]Provide via --api-key or ORNN_API_KEY environment variable.[/dim]",
+                    title="[bold red]Missing API Key[/bold red]",
+                    border_style="red",
+                )
+            )
+            raise typer.Exit(code=1)
+
+        console.print("\n  [bold]Uploading results...[/bold]")
+        upload_result = _perform_upload(report, api_key, console)
+        if upload_result is None:
+            console.print("  [red]Upload failed.[/red] Report saved locally.")
+            raise typer.Exit(code=1)
+
+        console.print(f"  Remote run ID: [bold]{upload_result.run_id}[/bold]\n")
+
+        # Verify local vs server scores (VAL-CROSS-002)
+        _perform_verify(report, api_key, console)
 
     if orch.has_failures:
         console.print(
@@ -381,14 +597,69 @@ def upload(
             envvar="ORNN_API_KEY",
         ),
     ] = None,
+    verify: Annotated[
+        bool,
+        typer.Option(
+            "--verify/--no-verify",
+            help="Verify local vs server scores after upload.",
+        ),
+    ] = True,
 ) -> None:
     """Upload a benchmark report to the Ornn API.
 
     Validates the report locally before uploading. Requires an API key
     provided via --api-key or the ORNN_API_KEY environment variable.
+
+    After successful upload, verifies local scores against server
+    recomputation (disable with --no-verify).
+
+    Retrying after a failure is safe — the API prevents duplicate uploads.
     """
-    typer.echo("Upload command is not yet implemented.")
-    raise typer.Exit(code=1)
+    # --- API key check ---
+    if not api_key:
+        console.print(
+            Panel(
+                "[red]API key required for upload.[/red]\n\n"
+                "[dim]Provide via --api-key or ORNN_API_KEY environment variable.[/dim]",
+                title="[bold red]Missing API Key[/bold red]",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    # --- Read and parse report ---
+    if not report_file.exists():
+        console.print(f"[red]Error:[/red] Report file not found: {report_file}")
+        raise typer.Exit(code=1)
+
+    try:
+        raw = report_file.read_text()
+        bench_report = BenchmarkReport.model_validate_json(raw)
+    except Exception as exc:
+        console.print(f"[red]Error:[/red] Failed to parse report: {exc}")
+        raise typer.Exit(code=1) from None
+
+    # --- Local validation (VAL-CLI-009) ---
+    validation_errors = validate_report_for_upload(bench_report)
+    if validation_errors:
+        console.print(
+            Panel(
+                "\n".join(f"  • {err}" for err in validation_errors),
+                title="[bold red]Report Validation Failed[/bold red]",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    # --- Upload ---
+    console.print(f"  Uploading [bold]{report_file}[/bold]...")
+    upload_result = _perform_upload(bench_report, api_key, console)
+    if upload_result is None:
+        raise typer.Exit(code=1)
+
+    # --- Server score verification (VAL-CROSS-002) ---
+    if verify and bench_report.scores.components:
+        _perform_verify(bench_report, api_key, console)
 
 
 # ---------------------------------------------------------------------------
