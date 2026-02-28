@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 from collections.abc import Generator
 from typing import Any
 
 import pytest
+from api.auth import reset_api_keys
 from api.dependencies import reset_dependencies, set_firestore_client
 from fastapi.testclient import TestClient
 
@@ -65,6 +67,9 @@ class FakeFirestoreClient:
 # Fixtures
 # ---------------------------------------------------------------------------
 
+# Default test API key used in tests
+TEST_API_KEY = "test-api-key-12345"
+
 
 @pytest.fixture()
 def fake_firestore() -> FakeFirestoreClient:
@@ -76,10 +81,16 @@ def fake_firestore() -> FakeFirestoreClient:
 def client(fake_firestore: FakeFirestoreClient) -> Generator[TestClient, None, None]:
     """Provide a FastAPI TestClient with injected fake dependencies.
 
-    Dependencies are reset after each test so that no state leaks.
+    Sets up a known API key for authentication tests and resets all
+    cached singletons after each test so that no state leaks.
     """
     reset_dependencies()
+    reset_api_keys()
     set_firestore_client(fake_firestore)
+
+    # Set known API keys for test isolation
+    os.environ["ORNN_API_KEYS"] = TEST_API_KEY
+    os.environ.pop("ORNN_REVOKED_API_KEYS", None)
 
     from api.main import create_app
 
@@ -88,3 +99,13 @@ def client(fake_firestore: FakeFirestoreClient) -> Generator[TestClient, None, N
         yield tc
 
     reset_dependencies()
+    reset_api_keys()
+    # Restore env
+    os.environ.pop("ORNN_API_KEYS", None)
+    os.environ.pop("ORNN_REVOKED_API_KEYS", None)
+
+
+@pytest.fixture()
+def auth_headers() -> dict[str, str]:
+    """Return headers with a valid API key for authenticated requests."""
+    return {"X-API-Key": TEST_API_KEY}
