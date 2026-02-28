@@ -1,0 +1,118 @@
+{
+  "groupId": "api-crud-auth",
+  "testedAt": "2026-02-28T05:09:40Z",
+  "credentials": {
+    "account": "test-key-1",
+    "namespace": "g1-"
+  },
+  "toolsUsed": ["curl"],
+  "assertions": [
+    {
+      "id": "VAL-API-001",
+      "title": "Authenticated run submission persistence",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "POST /api/v1/runs with valid payload and X-API-Key: test-key-1",
+          "expected": "HTTP 201 with run_id, received_at, stored_at in response",
+          "observed": "HTTP 201 returned. Response: {\"run_id\":\"238b20033c60463f9b00f617119090de\",\"received_at\":\"2026-02-28T05:09:40.552238+00:00\",\"stored_at\":\"2026-02-28T05:09:40.552238+00:00\"}"
+        },
+        {
+          "action": "GET /api/v1/runs/238b20033c60463f9b00f617119090de with X-API-Key: test-key-1",
+          "expected": "HTTP 200 with full persisted payload matching submitted data",
+          "observed": "HTTP 200 returned. Response contains full payload with matching report_id \"g1-test-001\", system_inventory, scores, and all submitted fields."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (API test)",
+        "network": "POST /api/v1/runs -> 201 (run_id=238b20033c60463f9b00f617119090de, received_at=2026-02-28T05:09:40.552238+00:00, stored_at=2026-02-28T05:09:40.552238+00:00); GET /api/v1/runs/238b20033c60463f9b00f617119090de -> 200 (full payload with report_id=g1-test-001)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-002",
+      "title": "Unauthorized access rejection",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "POST /api/v1/runs without X-API-Key header",
+          "expected": "HTTP 401 with no sensitive internal details",
+          "observed": "HTTP 401 returned. Response: {\"detail\":\"Missing API key. Provide a valid key via the X-API-Key header.\"}"
+        },
+        {
+          "action": "POST /api/v1/runs with X-API-Key: invalid-key-xyz",
+          "expected": "HTTP 401 with no sensitive internal details",
+          "observed": "HTTP 401 returned. Response: {\"detail\":\"Unauthorized.\"}"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (API test)",
+        "network": "POST /api/v1/runs (no key) -> 401 {\"detail\":\"Missing API key. Provide a valid key via the X-API-Key header.\"}; POST /api/v1/runs (invalid key) -> 401 {\"detail\":\"Unauthorized.\"}"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-003",
+      "title": "Request validation semantics",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "POST /api/v1/runs with partial payload (missing created_at, system_inventory, scores)",
+          "expected": "HTTP 422 with field-level validation errors",
+          "observed": "HTTP 422 returned. Response contains field-level errors: [{\"type\":\"missing\",\"loc\":[\"body\",\"created_at\"],\"msg\":\"Field required\"},{\"type\":\"missing\",\"loc\":[\"body\",\"system_inventory\"],\"msg\":\"Field required\"},{\"type\":\"missing\",\"loc\":[\"body\",\"scores\"],\"msg\":\"Field required\"}]"
+        },
+        {
+          "action": "POST /api/v1/runs with empty body {}",
+          "expected": "HTTP 422 with field-level validation errors for all required fields",
+          "observed": "HTTP 422 returned. Response contains 5 field-level errors for schema_version, report_id, created_at, system_inventory, scores — each with type \"missing\", loc path, and \"Field required\" message."
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (API test)",
+        "network": "POST /api/v1/runs (partial payload) -> 422 (3 field errors: created_at, system_inventory, scores); POST /api/v1/runs (empty body) -> 422 (5 field errors: schema_version, report_id, created_at, system_inventory, scores)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-004",
+      "title": "Retrieval semantics and access control",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "GET /api/v1/runs/238b20033c60463f9b00f617119090de with valid X-API-Key",
+          "expected": "HTTP 200 with stored run payload",
+          "observed": "HTTP 200 returned with full payload including run_id, report_id, system_inventory, scores, timestamps."
+        },
+        {
+          "action": "GET /api/v1/runs/nonexistent-run-id-12345 with valid X-API-Key",
+          "expected": "HTTP 404",
+          "observed": "HTTP 404 returned. Response: {\"detail\":\"Run not found.\"}"
+        },
+        {
+          "action": "GET /api/v1/runs/238b20033c60463f9b00f617119090de without X-API-Key header",
+          "expected": "HTTP 401",
+          "observed": "HTTP 401 returned. Response: {\"detail\":\"Missing API key. Provide a valid key via the X-API-Key header.\"}"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (API test)",
+        "network": "GET /api/v1/runs/{valid-id} (authed) -> 200; GET /api/v1/runs/{invalid-id} (authed) -> 404; GET /api/v1/runs/{valid-id} (no auth) -> 401"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Rate limit of 3 requests per 10 seconds required inserting 10-second sleeps between batches, extending total test time. Documented in user-testing.md.",
+      "resolved": true,
+      "resolution": "Batched requests into groups of 3 with 10-second waits between batches.",
+      "affectedAssertions": ["VAL-API-001", "VAL-API-002", "VAL-API-003", "VAL-API-004"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 4 assertions: 4 passed, 0 failed. All API CRUD and auth flows work as specified — authenticated submission returns 201 with timestamps and persists correctly (GET retrieval confirms), missing/invalid keys are rejected with 401, invalid payloads return 422 with field-level errors, and retrieval returns 200/404/401 appropriately."
+}

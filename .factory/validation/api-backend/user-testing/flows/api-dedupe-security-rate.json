@@ -1,0 +1,105 @@
+{
+  "groupId": "api-dedupe-security-rate",
+  "testedAt": "2026-02-28T05:12:08Z",
+  "credentials": {
+    "account": "test-key-2",
+    "namespace": "g2-"
+  },
+  "toolsUsed": ["curl"],
+  "assertions": [
+    {
+      "id": "VAL-API-006",
+      "title": "Idempotent ingest contract",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "POST /api/v1/runs with report_id=g2-dedupe-001, created_at=2024-01-15T11:00:00Z, schema_version=1.0.0 (first time)",
+          "expected": "201 Created with a run_id",
+          "observed": "201 Created, run_id=117ef4c0757b4d58b5f582aeacee7a6f"
+        },
+        {
+          "action": "POST /api/v1/runs with identical payload (same report_id, created_at, schema_version)",
+          "expected": "200 OK with the SAME run_id (dedupe hit)",
+          "observed": "200 OK, run_id=117ef4c0757b4d58b5f582aeacee7a6f (same as first)"
+        },
+        {
+          "action": "GET /api/v1/runs/117ef4c0757b4d58b5f582aeacee7a6f to verify single run stored",
+          "expected": "200 OK with stored run data matching submitted payload",
+          "observed": "200 OK, report_id=g2-dedupe-001, dedupe_key present (redacted), single run confirmed"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (API test)",
+        "network": "POST /api/v1/runs -> 201 (first), POST /api/v1/runs -> 200 (duplicate), GET /api/v1/runs/117ef4c0757b4d58b5f582aeacee7a6f -> 200"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-009",
+      "title": "Revoked key rejection",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "POST /api/v1/runs with X-API-Key: revoked-key-1",
+          "expected": "401 Unauthorized",
+          "observed": "401 with body {\"detail\":\"Unauthorized.\"}"
+        },
+        {
+          "action": "GET /api/v1/runs/some-id with X-API-Key: revoked-key-1",
+          "expected": "401 Unauthorized",
+          "observed": "401 with body {\"detail\":\"Unauthorized.\"}"
+        },
+        {
+          "action": "POST /api/v1/verify with X-API-Key: revoked-key-1",
+          "expected": "401 Unauthorized",
+          "observed": "401 with body {\"detail\":\"Unauthorized.\"}"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (API test)",
+        "network": "POST /api/v1/runs -> 401, GET /api/v1/runs/some-id -> 401, POST /api/v1/verify -> 401"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-010",
+      "title": "Rate limiting behavior",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Wait for clean rate limit window (20s), then send 4 rapid POST /api/v1/runs requests with test-key-2",
+          "expected": "First 3 requests return 2xx, 4th returns 429",
+          "observed": "Requests 1-3 returned 201 Created, request 4 returned 429 Too Many Requests"
+        },
+        {
+          "action": "Check 429 response for Retry-After header",
+          "expected": "429 response includes Retry-After header with retry guidance",
+          "observed": "429 response included 'retry-after: 23' header and body {\"detail\":\"Rate limit exceeded. Please retry later.\"}"
+        },
+        {
+          "action": "Wait for rate limit window to expire (25s), then send another POST request",
+          "expected": "Request succeeds with 2xx after window expiry",
+          "observed": "Request returned 201 Created, confirming rate limit window reset"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "n/a (API test)",
+        "network": "POST /api/v1/runs -> 201 (x3), POST /api/v1/runs -> 429 (with retry-after: 23), POST /api/v1/runs -> 201 (after window expiry)"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Initial rate limit test had stale window state from prior dedupe test requests. First attempt showed 429 on 3rd request instead of 4th because the rate limit window from VAL-API-006 testing had not fully expired.",
+      "resolved": true,
+      "resolution": "Waited 20 seconds for clean window before re-running the rate limit burst test, which then correctly showed 3 successes and 4th as 429.",
+      "affectedAssertions": ["VAL-API-010"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 3 assertions: all 3 passed. VAL-API-006 confirmed idempotent dedupe (same run_id on duplicate POST, 201->200 status transition). VAL-API-009 confirmed revoked-key-1 is rejected with 401 on all 3 authenticated endpoints. VAL-API-010 confirmed per-key rate limiting at 3 req/10s with 429 + Retry-After header and successful recovery after window expiry."
+}

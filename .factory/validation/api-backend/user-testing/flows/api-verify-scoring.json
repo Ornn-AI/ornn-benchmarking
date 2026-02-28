@@ -1,0 +1,100 @@
+{
+  "groupId": "api-verify-scoring",
+  "testedAt": "2026-02-28T00:00:00Z",
+  "credentials": {
+    "account": "test-key-3",
+    "namespace": "g3-"
+  },
+  "toolsUsed": ["curl"],
+  "assertions": [
+    {
+      "id": "VAL-API-005",
+      "title": "Verification endpoint mismatch detail",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "POST /api/v1/verify with matching scores (bw=1.0, fp8=1.0, bf16=1.0, ar=1.0, ornn_i=100.0, ornn_t=100.0, qualification=Premium)",
+          "expected": "Status 'verified' with all metric_details match=true",
+          "observed": "Status 'verified', server_ornn_i=100.0, server_ornn_t=100.0, server_qualification=Premium, all metric_details match=true, delta=0.0"
+        },
+        {
+          "action": "POST /api/v1/verify with mismatched scores (same components but ornn_i=95.0, ornn_t=88.0, qualification=Standard)",
+          "expected": "Status 'mismatch' with per-metric details showing ornn_i, ornn_t, and qualification deltas",
+          "observed": "Status 'mismatch', metric_details: ornn_i delta=5.0 match=false, ornn_t delta=12.0 match=false, qualification match=false. Server computed ornn_i=100.0, ornn_t=100.0, qualification=Premium"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "N/A (API test)",
+        "network": "POST /api/v1/verify -> 200 (match case: status=verified), POST /api/v1/verify -> 200 (mismatch case: status=mismatch with per-metric deltas)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-007",
+      "title": "Server score formula correctness",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "POST /api/v1/verify with test vector 1: bw=1.0, fp8=1.0, bf16=1.0, ar=1.0",
+          "expected": "Ornn-I = 55*(1.0/1.0) + 45*(1.0/1.0) = 100.0, Ornn-T = 55*(1.0/1.0) + 45*(1.0/1.0) = 100.0",
+          "observed": "server_ornn_i=100.0, server_ornn_t=100.0 — exact match with expected formula output"
+        },
+        {
+          "action": "POST /api/v1/verify with test vector 2: bw=1.25, fp8=0.95, bf16=1.1, ar=0.85",
+          "expected": "Ornn-I = 55*(1.25) + 45*(0.95) = 68.75 + 42.75 = 111.5, Ornn-T = 55*(1.1) + 45*(0.85) = 60.5 + 38.25 = 98.75",
+          "observed": "server_ornn_i=111.5, server_ornn_t=98.75 — exact match with expected formula output"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "N/A (API test)",
+        "network": "POST /api/v1/verify -> 200 (vector 1: server_ornn_i=100.0, server_ornn_t=100.0, status=verified), POST /api/v1/verify -> 200 (vector 2: server_ornn_i=111.5, server_ornn_t=98.75, status=verified)"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-API-008",
+      "title": "Qualification rule correctness",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "POST /api/v1/verify with Premium boundary: bw=0.9, fp8=0.9, bf16=0.9, ar=0.9 (ornn_i=90, ornn_t=90, composite=90)",
+          "expected": "qualification=Premium (composite >= 90 AND both floors >= 80)",
+          "observed": "server_qualification=Premium, status=verified — correct"
+        },
+        {
+          "action": "POST /api/v1/verify with Standard case: bw=0.75, fp8=0.75, bf16=0.65, ar=0.65 (ornn_i=75, ornn_t=65, composite=70)",
+          "expected": "qualification=Standard (composite >= 70 AND both floors >= 60)",
+          "observed": "server_qualification=Standard, status=verified — correct"
+        },
+        {
+          "action": "POST /api/v1/verify with Below case: bw=0.5, fp8=0.5, bf16=0.5, ar=0.5 (ornn_i=50, ornn_t=50, composite=50)",
+          "expected": "qualification=Below (composite < 70)",
+          "observed": "server_qualification=Below, status=verified — correct"
+        },
+        {
+          "action": "POST /api/v1/verify with edge case: bw=0.95, fp8=0.95, bf16=0.79, ar=0.79 (ornn_i=95, ornn_t=79, composite=87)",
+          "expected": "qualification=Standard (composite=87 >= 90? No because ornn_t=79 < 80 floor; but composite >= 70 and both >= 60 so Standard)",
+          "observed": "server_qualification=Standard, status=verified — correctly classified as Standard, not Premium, due to ornn_t=79 < 80 floor"
+        }
+      ],
+      "evidence": {
+        "screenshots": [],
+        "consoleErrors": "N/A (API test)",
+        "network": "POST /api/v1/verify -> 200 (Premium: composite=90, both>=80), POST /api/v1/verify -> 200 (Standard: composite=70, both>=60), POST /api/v1/verify -> 200 (Below: composite=50), POST /api/v1/verify -> 200 (Edge: composite=87 but ornn_t=79<80 → Standard)"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Rate limit of 3 requests per 10 seconds required sleeping between test batches, slowing down the test execution",
+      "resolved": true,
+      "resolution": "Added 11-second sleep intervals between batches of 3 requests",
+      "affectedAssertions": ["VAL-API-007", "VAL-API-008"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 3 assertions: all 3 passed. VAL-API-005 confirmed verified/mismatch status with per-metric deltas. VAL-API-007 confirmed exact formula recomputation (Ornn-I=55*(bw/ref)+45*(fp8/ref), Ornn-T=55*(bf16/ref)+45*(ar/ref)) for two deterministic test vectors. VAL-API-008 confirmed Premium/Standard/Below qualification gates with floor logic including edge case where high composite but one floor below threshold correctly classifies as Standard."
+}
