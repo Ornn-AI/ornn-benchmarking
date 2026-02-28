@@ -1,0 +1,21 @@
+commands:
+  install: ./.venv/bin/python -m pip install -e ".[dev]"
+  lint: ./.venv/bin/python -m ruff check .
+  typecheck: ./.venv/bin/python -m mypy src api
+  test: ./.venv/bin/python -m pytest -q
+  build: ./.venv/bin/python -m build
+
+services:
+  firestore-emulator:
+    start: gcloud emulators firestore start --host-port=127.0.0.1:8085
+    stop: pids=$(lsof -ti :8085); [ -z "$pids" ] || kill $pids
+    healthcheck: lsof -i :8085
+    port: 8085
+    depends_on: []
+
+  api:
+    start: FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 PORT=8080 ./.venv/bin/python -m uvicorn api.main:app --host 0.0.0.0 --port 8080
+    stop: pids=$(lsof -ti :8080); [ -z "$pids" ] || kill $pids
+    healthcheck: curl -sf http://localhost:8080/health
+    port: 8080
+    depends_on: [firestore-emulator]
