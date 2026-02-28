@@ -48,6 +48,7 @@ dev = [
     "ruff>=0.4.0",
     "mypy>=1.8.0",
     "build>=1.0.0",
+    "pyyaml>=6.0",
     "ornn-bench[api]",
 ]
 api = [
