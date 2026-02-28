@@ -1,0 +1,48 @@
+{
+  "flowId": "cli-display",
+  "testedAt": "2026-02-27T12:00:00Z",
+  "credentials": {
+    "account": "N/A",
+    "namespace": "N/A"
+  },
+  "toolsUsed": ["Execute"],
+  "assertions": {
+    "VAL-CLI-007": {
+      "status": "pass",
+      "evidence": "Ran `./.venv/bin/ornn-bench report tests/fixtures/sample_report.json` and `./.venv/bin/ornn-bench report tests/fixtures/sample_scored_report.json`. Both render a clean Rich-formatted scorecard displaying: Ornn-I (Inference): 92.5, Ornn-T (Training): 88.3, component metrics (Memory Bandwidth BW: 1.2500, FP8 Compute: 0.9500, BF16 Compute: 1.1000, All-Reduce AR: 0.8500), and qualification outcome (★ Premium) with Score Status (✓ Valid). Output uses well-structured Rich panels and tables with clear section headers (Report Metadata, Sections, Ornn Scores, Component Metrics, Qualification). Exit code 0.",
+      "details": "Scorecard displays all required elements: Ornn-I, Ornn-T, all four component metrics (bw, fp8, bf16, ar), and qualification badge (Premium) with clean readable formatting. Both sample_report.json and sample_scored_report.json render identically. Plain text mode (--plain) also displays all required fields in a clean ASCII format without box-drawing characters. 20 automated tests in test_report_command.py all pass.",
+      "steps": [
+        {"action": "ornn-bench report tests/fixtures/sample_report.json", "expected": "Scorecard with Ornn-I, Ornn-T, components, qualification", "observed": "All values displayed: Ornn-I=92.5, Ornn-T=88.3, BW=1.25, FP8=0.95, BF16=1.10, AR=0.85, Qualification=Premium"},
+        {"action": "ornn-bench report tests/fixtures/sample_scored_report.json", "expected": "Same scorecard for scored report fixture", "observed": "Identical scorecard rendered successfully"},
+        {"action": "ornn-bench report --plain", "expected": "Plain text scorecard with same metrics", "observed": "Clean ASCII output with all metrics and qualification displayed"},
+        {"action": "pytest tests/cli/test_report_command.py", "expected": "All tests pass", "observed": "20/20 passed"}
+      ]
+    },
+    "VAL-CLI-008": {
+      "status": "pass",
+      "evidence": "Ran `ornn-bench report tests/fixtures/sample_report.json` on macOS host without NVIDIA GPU tools (no nvidia-smi, no CUDA). Command succeeded with exit code 0 and rendered the full scorecard including all sections, scores, component metrics, and qualification. Also tested with --json and --plain flags, all exit code 0. No GPU dependency errors or tracebacks.",
+      "details": "The report command successfully re-renders saved reports on non-GPU machines. Tested both fixture files (sample_report.json and sample_scored_report.json). All three output modes (rich/default, --json, --plain) work without GPU tools. Exit code 0 in all cases. 20 automated tests in test_report_command.py confirm this behavior.",
+      "steps": [
+        {"action": "ornn-bench report tests/fixtures/sample_report.json (on non-GPU macOS)", "expected": "Report renders without GPU errors", "observed": "Full scorecard rendered, exit code 0"},
+        {"action": "ornn-bench report tests/fixtures/sample_report.json --json (on non-GPU macOS)", "expected": "JSON output without GPU errors", "observed": "Valid JSON output, exit code 0"},
+        {"action": "ornn-bench report tests/fixtures/sample_report.json --plain (on non-GPU macOS)", "expected": "Plain text output without GPU errors", "observed": "Clean plain text output, exit code 0"},
+        {"action": "ornn-bench report tests/fixtures/sample_scored_report.json (on non-GPU macOS)", "expected": "Scored report renders without GPU errors", "observed": "Full scorecard rendered, exit code 0"}
+      ]
+    },
+    "VAL-CLI-011": {
+      "status": "pass",
+      "evidence": "Tested three non-TTY/machine-readable scenarios: (1) --json flag outputs valid parseable JSON with zero ANSI escape sequences (verified via python json.tool and byte-level ESC scan showing 0 \\x1b bytes). (2) --plain flag outputs clean ASCII text with zero ANSI escape sequences. (3) Piped output (| cat) contains zero ANSI escape sequences (confirmed via od -c and python byte scan). Box-drawing characters in piped default output are UTF-8 Unicode, not ANSI escapes. JSON output contains all expected fields (scores.ornn_i, scores.ornn_t, scores.qualification). 19 automated tests in test_non_tty_output.py all pass.",
+      "details": "JSON mode produces machine-readable output that parses cleanly with json.loads(). Plain mode produces clean ASCII without control characters. Piped output has no ANSI CSI sequences (\\x1b[). The default rich output when piped contains Unicode box-drawing characters but zero ANSI color/formatting escapes, making it safe for log capture. All 19 non-TTY output tests pass.",
+      "steps": [
+        {"action": "ornn-bench report sample_report.json --json | python -m json.tool", "expected": "Valid JSON output", "observed": "JSON parsed successfully, contains all expected keys"},
+        {"action": "ornn-bench report sample_report.json --json | python byte-scan for \\x1b", "expected": "Zero ANSI escape bytes", "observed": "ESC byte count: 0, ANSI CSI sequences: 0"},
+        {"action": "ornn-bench report sample_report.json --plain | cat -v | grep ESC", "expected": "No ANSI escapes in plain output", "observed": "No ANSI escapes found"},
+        {"action": "ornn-bench report sample_report.json | python byte-scan for \\x1b", "expected": "Zero ANSI escapes in piped output", "observed": "ESC byte count: 0, ANSI CSI sequences: 0"},
+        {"action": "pytest tests/cli/test_non_tty_output.py", "expected": "All tests pass", "observed": "19/19 passed"}
+      ]
+    }
+  },
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 3 assertions: 3 passed. VAL-CLI-007: Scorecard displays Ornn-I, Ornn-T, all component metrics, and Premium qualification in clean Rich formatting. VAL-CLI-008: Report re-renders successfully on non-GPU macOS host with exit code 0 across all output modes. VAL-CLI-011: JSON output is valid parseable JSON, plain text is clean ASCII, and piped output contains zero ANSI escape sequences. All 39 automated tests (20 report + 19 non-TTY) pass."
+}

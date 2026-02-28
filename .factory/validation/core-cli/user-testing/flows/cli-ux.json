@@ -1,0 +1,74 @@
+{
+  "groupId": "cli-ux",
+  "testedAt": "2026-02-27T12:00:00Z",
+  "credentials": {
+    "account": "N/A",
+    "namespace": "N/A"
+  },
+  "toolsUsed": ["Execute"],
+  "assertions": [
+    {
+      "id": "VAL-CLI-002",
+      "title": "Help and discoverability coverage",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `ornn-bench --help`",
+          "expected": "Lists commands: run, info, report, upload",
+          "observed": "Commands section lists: run, info, report, upload with descriptions"
+        },
+        {
+          "action": "Run `ornn-bench run --help`",
+          "expected": "Documents scope/selective-run flags and output path options",
+          "observed": "Shows --compute-only, --memory-only, --interconnect-only scope flags, --output/-o PATH option, and --upload flag"
+        }
+      ],
+      "evidence": {
+        "terminal_output_help": "Usage: ornn-bench [OPTIONS] COMMAND [ARGS]...\nCommands: run, info, report, upload",
+        "terminal_output_run_help": "Usage: ornn-bench run [OPTIONS]\nOptions: --compute-only, --memory-only, --interconnect-only, --output/-o PATH, --upload, --help",
+        "consoleErrors": "none",
+        "exitCodes": "both commands exited 0"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-003",
+      "title": "Environment info diagnostics",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `ornn-bench info`",
+          "expected": "Reports detected GPU/dependency status and prints actionable remediation when GPU/tools are missing",
+          "observed": "Shows System (OS, Kernel, CPU), GPU section (nvidia-smi not found + remediation: 'Install NVIDIA GPU drivers'), Python (version, PyTorch status), and Benchmark Tools table listing nvidia-smi, nvbandwidth, nccl-tests each with '✗ missing' status and actionable install/build instructions with URLs"
+        }
+      ],
+      "evidence": {
+        "terminal_output": "System: Darwin 25.3.0, Apple M4\nGPU: nvidia-smi not found on PATH — Install NVIDIA GPU drivers.\nPython: 3.14.0, PyTorch not installed\nBenchmark Tools: nvidia-smi (✗ missing, docs.nvidia.com link), nvbandwidth (✗ missing, github source link), nccl-tests (✗ missing, github source link)",
+        "consoleErrors": "none",
+        "exitCode": 0
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-010",
+      "title": "No-GPU run guardrail",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `ornn-bench run` on macOS host without NVIDIA GPU",
+          "expected": "Exits gracefully with clear guidance and no crash",
+          "observed": "Displays styled panel 'No NVIDIA GPU Detected' with explanation, 3-step remediation list, cloud instance tip, driver install URL, and suggestions to use 'info' or 'report' commands instead. Exits with code 1. No traceback or crash."
+        }
+      ],
+      "evidence": {
+        "terminal_output": "╭─── No NVIDIA GPU Detected ───╮\nNo NVIDIA GPU detected: nvidia-smi not found on PATH.\nTo run GPU benchmarks you need:\n  1. A machine with an NVIDIA GPU\n  2. NVIDIA drivers installed\n  3. CUDA toolkit installed\nIf you are on a cloud instance, ensure you selected a GPU instance type.\nhttps://docs.nvidia.com/datacenter/tesla/driver-installation-guide/\nYou can still use 'ornn-bench info' or 'ornn-bench report <file>'.",
+        "consoleErrors": "none",
+        "exitCode": 1
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 3 assertions: 3 passed, 0 failed, 0 blocked. All CLI UX assertions verified on macOS non-GPU host."
+}

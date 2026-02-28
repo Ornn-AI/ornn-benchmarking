@@ -1,0 +1,18 @@
+{
+  "flowId": "scoring",
+  "assertions": {
+    "VAL-RUNBOOK-010": {
+      "status": "pass",
+      "evidence": "All 7 multi-GPU aggregation tests pass (TestPerGPUScoring: test_single_gpu_aggregate_is_identity, test_multi_gpu_uses_minimum, test_per_gpu_records_preserved, test_aggregate_method_explicitly_recorded, test_multi_gpu_qualification_uses_aggregate, test_empty_gpu_list, test_multi_gpu_with_partial_metrics). Source code verified: aggregate_gpu_scores() in scoring.py computes per-GPU Ornn-I/Ornn-T, stores PerGPUScoreRecord list with gpu_uuid/ornn_i/ornn_t/components, aggregates via MINIMUM method, and explicitly records aggregate_method='minimum' in ScoreResult. Model verified: ScoreResult includes per_gpu_scores (list[PerGPUScoreRecord]) and aggregate_method (str|None). Fixture sample_report.json includes per_gpu_scores and aggregate_method fields in scores section.",
+      "details": "Tests confirm: (1) per-GPU metric records preserved with gpu_uuid, (2) aggregate uses minimum-GPU semantics (worst GPU gates), (3) aggregate_method is AggregateMethod.MINIMUM explicitly recorded, (4) qualification based on aggregate scores, (5) empty GPU list returns ERROR status, (6) partial metrics across GPUs handled gracefully with PARTIAL status. 60/60 tests passed."
+    },
+    "VAL-RUNBOOK-011": {
+      "status": "pass",
+      "evidence": "All 33 scoring edge-case tests pass across TestMissingMetricValues (6), TestInvalidReferenceValues (7), TestNaNAndInfInputs (6), TestNegativeMetricValues (4), TestScoreStatusExplicitness (6), TestAggregationWithInvalidGPUs (4). Source code verified: _is_valid_metric() rejects None/NaN/Inf/negative; _is_valid_ref() rejects zero/negative/NaN/Inf; compute_ornn_i/compute_ornn_t return None on invalid input; compute_scores() sets ScoreStatus.ERROR when no valid metrics, PARTIAL when some missing, VALID only when all present; score_status_detail provides human-readable reason. test_score_never_nan confirms scores are never NaN across all invalid input combinations. test_aggregate_never_nan confirms multi-GPU aggregation never produces NaN.",
+      "details": "Tests confirm: (1) missing/None metrics produce None score not NaN, (2) NaN/Inf/negative metric values produce None not silent success, (3) zero/negative reference values produce None not division-by-zero, (4) ScoreStatus is always explicit (VALID/PARTIAL/ERROR), (5) score_status_detail provides actionable context, (6) multi-GPU aggregation with invalid GPUs returns PARTIAL/ERROR not NaN, (7) core invariant 'scores must never be NaN' verified across all edge cases. 60/60 tests passed."
+    }
+  },
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["Execute"]
+}

@@ -1,0 +1,73 @@
+{
+  "groupId": "cli-basic",
+  "testedAt": "2026-02-27T00:00:00Z",
+  "credentials": {
+    "account": "local-shell",
+    "namespace": "cli-basic"
+  },
+  "toolsUsed": ["Execute"],
+  "assertions": {
+    "VAL-CLI-002": {
+      "status": "pass",
+      "title": "Help and discoverability coverage",
+      "steps": [
+        {
+          "action": "Run `ornn-bench --help`",
+          "expected": "Lists run, info, report, upload commands",
+          "observed": "Commands section lists: run, info, report, upload — all present"
+        },
+        {
+          "action": "Run `ornn-bench run --help`",
+          "expected": "Documents --compute-only, --memory-only, --interconnect-only, --output/-o flags",
+          "observed": "Options section shows: --compute-only, --memory-only, --interconnect-only, --output/-o PATH, --upload — all scope/selective-run flags and output path options present"
+        }
+      ],
+      "evidence": {
+        "terminal_output_help": "Usage: ornn-bench [OPTIONS] COMMAND [ARGS]... Commands: run, info, report, upload. Exit code 0.",
+        "terminal_output_run_help": "Usage: ornn-bench run [OPTIONS]. Options: --compute-only, --memory-only, --interconnect-only, --output/-o PATH, --upload, --help. Exit code 0.",
+        "consoleErrors": "none"
+      },
+      "reason": "All four commands (run, info, report, upload) listed in --help. Run --help documents all scope flags (--compute-only, --memory-only, --interconnect-only) and output path option (-o/--output).",
+      "issues": null
+    },
+    "VAL-CLI-003": {
+      "status": "pass",
+      "title": "Environment info diagnostics",
+      "steps": [
+        {
+          "action": "Run `ornn-bench info` on macOS without NVIDIA GPU",
+          "expected": "Shows system info (OS, kernel, CPU), GPU section with missing-GPU remediation, Python section, benchmark tools section with remediation",
+          "observed": "System section: OS=Darwin 25.3.0, Kernel=25.3.0, CPU=Apple M4. GPU section: 'nvidia-smi not found on PATH' with remediation 'Install NVIDIA GPU drivers. On Ubuntu: sudo apt install nvidia-driver-535.' Python section: Python 3.14.0, PyTorch not installed. Benchmark Tools table: nvidia-smi (missing, with link), nvbandwidth (missing, with build instructions), nccl-tests (missing, with build instructions). Exit code 0."
+        }
+      ],
+      "evidence": {
+        "terminal_output": "System: OS=Darwin 25.3.0, Kernel=25.3.0, CPU=Apple M4. GPU: nvidia-smi not found, remediation provided. Python: 3.14.0, PyTorch not installed. Benchmark Tools: nvidia-smi ✗ missing, nvbandwidth ✗ missing, nccl-tests ✗ missing — each with actionable remediation text and URLs.",
+        "consoleErrors": "none"
+      },
+      "reason": "Info command displays system info (OS, kernel, CPU), GPU status with actionable remediation for missing nvidia-smi, Python version/PyTorch status, and benchmark tools table with per-tool remediation instructions and links.",
+      "issues": null
+    },
+    "VAL-CLI-010": {
+      "status": "pass",
+      "title": "No-GPU run guardrail",
+      "steps": [
+        {
+          "action": "Run `ornn-bench run` on macOS without NVIDIA GPU",
+          "expected": "Exits with code 1, shows clear 'No NVIDIA GPU Detected' message with guidance, no Python traceback",
+          "observed": "Exits with code 1. Displays bordered panel titled 'No NVIDIA GPU Detected' with explanation: 'nvidia-smi not found on PATH', 3-step remediation (NVIDIA GPU, drivers, CUDA toolkit), cloud instance hint, and pointers to 'ornn-bench info' and 'ornn-bench report'. No Python traceback in output."
+        }
+      ],
+      "evidence": {
+        "terminal_output": "Panel: 'No NVIDIA GPU Detected' — 'No NVIDIA GPU detected: nvidia-smi not found on PATH.' Guidance: 1) A machine with an NVIDIA GPU, 2) NVIDIA drivers installed, 3) CUDA toolkit installed. Cloud instance hint. Links to driver guide. Suggests 'ornn-bench info' and 'ornn-bench report <file>'.",
+        "exit_code": 1,
+        "traceback_present": false,
+        "consoleErrors": "none"
+      },
+      "reason": "CLI exits with code 1, displays a clear 'No NVIDIA GPU Detected' panel with actionable remediation steps, and produces no Python traceback.",
+      "issues": null
+    }
+  },
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 3 assertions: 3 passed. VAL-CLI-002 (help coverage), VAL-CLI-003 (environment info diagnostics), and VAL-CLI-010 (no-GPU guardrail) all behave as specified."
+}

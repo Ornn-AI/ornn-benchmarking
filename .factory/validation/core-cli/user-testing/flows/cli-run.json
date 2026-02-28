@@ -1,0 +1,58 @@
+{
+  "flowId": "cli-run",
+  "testedAt": "2026-02-27T23:00:00Z",
+  "credentials": {
+    "account": "N/A",
+    "namespace": "N/A"
+  },
+  "toolsUsed": ["Execute"],
+  "assertions": {
+    "VAL-CLI-004": {
+      "status": "pass",
+      "evidence": "CLI: `ornn-bench run` on non-GPU host exits with code 1 and displays a clean Rich-formatted panel titled 'No NVIDIA GPU Detected' with actionable guidance (driver install link, alternative commands). No traceback or crash. Automated tests: 20/20 passed in tests/cli/test_run_orchestration.py — validates (with mocked GPU) that run produces JSON report at specified --output path with 'sections' and 'schema_version' keys, shows progress/completion text, and never emits raw traceback. Tests confirm orchestrator calls progress callback for each section start/finish, and report file contains all SECTION_ORDER sections.",
+      "details": "On non-GPU host, the no-GPU guardrail triggers cleanly as expected. The guardrail shows: 1) What's missing (nvidia-smi), 2) What's needed (NVIDIA GPU, drivers, CUDA), 3) Alternative commands (ornn-bench info, ornn-bench report). Exit code is 1. Mocked-GPU tests verify: report JSON written to --output path, progress text in output (contains 'complete'/'done'/'finished'/✓), no 'Traceback' in output.",
+      "steps": [
+        {"action": "Run `ornn-bench run`", "expected": "Clean no-GPU guardrail exit with code 1", "observed": "Rich panel 'No NVIDIA GPU Detected' with guidance, exit code 1, no traceback"},
+        {"action": "Run pytest tests/cli/test_run_orchestration.py", "expected": "All tests pass", "observed": "20/20 passed in 0.07s — covers progress callbacks, report file generation, scorecard display, no traceback"}
+      ]
+    },
+    "VAL-CLI-005": {
+      "status": "pass",
+      "evidence": "CLI: `ornn-bench run --compute-only`, `--memory-only`, `--interconnect-only` all trigger the no-GPU guardrail cleanly (exit code 1, no crash) — scope flags are recognized by the CLI parser. `ornn-bench run --help` confirms all three scope flags are documented. Automated tests: TestScopeControls (6 tests) in test_run_orchestration.py all pass — validate that compute-only runs pre-flight+compute+post-flight+manifest and skips memory+interconnect; memory-only skips compute+interconnect; interconnect-only skips compute+memory; skipped sections have status=SKIPPED; no-scope runs all; multiple scopes work. CLI integration tests confirm --compute-only, --memory-only, --interconnect-only flags work without crash.",
+      "details": "Scope flags are properly parsed and passed to RunOrchestrator. Infrastructure sections (pre-flight, post-flight, manifest) always run regardless of scope. Skipped sections are explicitly marked with BenchmarkStatus.SKIPPED. Multiple scope selections (e.g., compute+memory) work correctly, skipping only interconnect.",
+      "steps": [
+        {"action": "Run `ornn-bench run --compute-only`", "expected": "Scope flag recognized, clean guardrail exit", "observed": "Flag accepted, no-GPU guardrail triggered cleanly, exit code 1"},
+        {"action": "Run `ornn-bench run --memory-only`", "expected": "Scope flag recognized, clean guardrail exit", "observed": "Flag accepted, no-GPU guardrail triggered cleanly, exit code 1"},
+        {"action": "Run `ornn-bench run --interconnect-only`", "expected": "Scope flag recognized, clean guardrail exit", "observed": "Flag accepted, no-GPU guardrail triggered cleanly, exit code 1"},
+        {"action": "Run `ornn-bench run --help`", "expected": "All scope flags documented", "observed": "--compute-only, --memory-only, --interconnect-only all listed with descriptions"},
+        {"action": "Run pytest TestScopeControls + TestRunCommandCLI", "expected": "All scope tests pass", "observed": "6 scope tests + 3 CLI integration tests all passed"}
+      ]
+    },
+    "VAL-CLI-006": {
+      "status": "pass",
+      "evidence": "Automated tests: 17/17 passed in tests/cli/test_partial_failure_flow.py. Tests cover: (1) Partial failure continuation — compute failure doesn't abort memory/interconnect; memory failure doesn't abort interconnect; multiple failures still complete healthy sections. (2) Failed sections record descriptive error messages. (3) Timeout handling — timed-out sections marked TIMEOUT with error message containing 'timed out'; remaining sections still execute. (4) Exception safety — unexpected RuntimeError caught as FAILED status, does not abort remaining sections. (5) Exit code — CLI returns non-zero exit code on partial failure, zero on full success. (6) No traceback — CLI output contains no 'Traceback' or 'raise ' text on partial failure. (7) Report durability — JSON report still written on partial failure with failed section status='failed'.",
+      "details": "The orchestrator wraps each section runner in exception handling: unexpected exceptions are caught and recorded as FAILED status. The has_failures property tracks whether any section failed/timed out, driving the CLI exit code. The report is always written regardless of section failures. Output never contains raw Python tracebacks. Failed sections include descriptive error messages.",
+      "steps": [
+        {"action": "Run pytest tests/cli/test_partial_failure_flow.py -v", "expected": "All 17 tests pass", "observed": "17/17 passed in 0.06s"},
+        {"action": "Verify TestPartialFailureContinuation (4 tests)", "expected": "Failures in one section don't abort others", "observed": "compute failure → memory+interconnect complete; memory failure → interconnect completes; multiple failures → healthy sections complete; error messages recorded"},
+        {"action": "Verify TestTimeoutHandling (3 tests)", "expected": "Timeout status recorded, remaining sections execute", "observed": "TIMEOUT status set, 'timed out' in error message, interconnect still completes after memory timeout"},
+        {"action": "Verify TestExceptionSafety (2 tests)", "expected": "Unexpected exceptions caught as FAILED", "observed": "RuntimeError caught, status=FAILED, remaining sections execute"},
+        {"action": "Verify TestFailureReporting (3 tests)", "expected": "has_failures correct for pass/fail/timeout", "observed": "False when all pass, True on failure, True on timeout"},
+        {"action": "Verify TestPartialFailureCLI (5 tests)", "expected": "Non-zero exit code, no traceback, report still written", "observed": "exit_code != 0 on failure, exit_code == 0 on success, no 'Traceback' in output, report.json created with status='failed' for compute"}
+      ]
+    },
+    "VAL-RUNBOOK-007": {
+      "status": "pass",
+      "evidence": "Automated tests: TestSectionOrdering (6 tests) in test_run_orchestration.py all pass. Tests verify: (1) SECTION_ORDER is a defined non-empty tuple/list with ≥4 entries. (2) pre-flight is first. (3) post-flight comes after compute/memory/interconnect. (4) manifest is last. (5) Orchestrator executes sections in exact SECTION_ORDER (verified via call_order tracking). (6) Every completed section has started_at and finished_at timestamps. Fixture inspection: sample_report.json confirms order [pre-flight, compute, memory, interconnect, monitoring, post-flight, manifest] with monotonically increasing timestamps (except monitoring which runs concurrently during benchmarks).",
+      "details": "SECTION_ORDER constant defines the deterministic execution sequence. The RunOrchestrator iterates through runners in SECTION_ORDER, calling each runner's run() method sequentially. Each SectionResult includes started_at and finished_at ISO timestamps. The sample_report.json fixture shows timestamps proving sequential execution: pre-flight 10:30:00-10:30:05, compute 10:30:05-10:35:00, memory 10:35:00-10:40:00, interconnect 10:40:00-10:45:00, post-flight 10:45:00-10:45:30, manifest 10:45:30-10:45:31.",
+      "steps": [
+        {"action": "Run pytest TestSectionOrdering", "expected": "All 6 ordering tests pass", "observed": "6/6 passed — SECTION_ORDER defined, pre-flight first, post-flight after benchmarks, manifest last, orchestrator runs in order, timestamps present"},
+        {"action": "Inspect tests/fixtures/sample_report.json", "expected": "Sections in correct order with monotonic timestamps", "observed": "Order: pre-flight→compute→memory→interconnect→monitoring→post-flight→manifest. Timestamps strictly increasing (excluding monitoring concurrent section)"},
+        {"action": "Run Python verification script on fixture", "expected": "All ordering and timestamp assertions pass", "observed": "All assertions passed: pre-flight first, manifest last, benchmarks before post-flight, timestamps monotonically increasing"}
+      ]
+    }
+  },
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 4 assertions: all 4 passed. VAL-CLI-004 (run UX/report) validated via no-GPU guardrail clean exit + 20 mocked-GPU tests. VAL-CLI-005 (scope controls) validated via 3 CLI scope flag checks + 9 automated tests. VAL-CLI-006 (partial failure) validated via 17 automated tests covering failure continuation, timeout handling, exception safety, exit codes, and traceback suppression. VAL-RUNBOOK-007 (ordered phases) validated via 6 ordering tests + fixture timestamp inspection."
+}

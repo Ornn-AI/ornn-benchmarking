@@ -1,0 +1,217 @@
+{
+  "groupId": "cli-orchestration",
+  "testedAt": "2026-02-27T00:00:00Z",
+  "credentials": {
+    "account": "n/a",
+    "namespace": "cli-orchestration"
+  },
+  "toolsUsed": ["Execute"],
+  "assertions": [
+    {
+      "id": "VAL-CLI-004",
+      "title": "Full run UX and report generation",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Examined source: src/ornn_bench/cli.py run command",
+          "expected": "Progress callback emits start/complete/skip/fail/timeout per section",
+          "observed": "cli.py _on_progress prints ▶ Running, ✓ completed, - skipped, ✗ failed, ⏱ timed out for each section"
+        },
+        {
+          "action": "Examined source: cli.py report writing",
+          "expected": "JSON report written to default or --output path",
+          "observed": "Default path is ornn_report_{id[:8]}.json; --output flag overrides. Report written via model_dump_json(indent=2)"
+        },
+        {
+          "action": "Examined source: cli.py scorecard display",
+          "expected": "Scorecard rendered after run",
+          "observed": "render_scorecard(report.scores, console=console) called after report write"
+        },
+        {
+          "action": "Run test: tests/cli/test_run_orchestration.py::TestRunProgress::test_orchestrator_calls_progress_callback",
+          "expected": "Progress callback invoked for started and completed events",
+          "observed": "PASSED — callback receives started and completed events for all sections"
+        },
+        {
+          "action": "Run test: tests/cli/test_run_orchestration.py::TestRunCommandCLI::test_run_produces_json_report_file",
+          "expected": "JSON report file created at --output path with sections and schema_version",
+          "observed": "PASSED — report.json created, contains 'sections' and 'schema_version' keys"
+        },
+        {
+          "action": "Run test: tests/cli/test_run_orchestration.py::TestRunCommandCLI::test_run_shows_progress_text",
+          "expected": "CLI output contains completion/progress indicators",
+          "observed": "PASSED — output contains progress text (✓ or 'complete')"
+        },
+        {
+          "action": "Run test: tests/cli/test_run_orchestration.py::TestRunProgress::test_report_has_sections",
+          "expected": "Report contains results for all SECTION_ORDER sections",
+          "observed": "PASSED — len(report.sections) == len(SECTION_ORDER)"
+        }
+      ],
+      "evidence": {
+        "testResults": "20/20 passed in tests/cli/test_run_orchestration.py",
+        "sourceCode": "cli.py:run() writes JSON to default or --output path, invokes _on_progress for live UX, calls render_scorecard",
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-005",
+      "title": "Scope controls execute only selected sections",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Examined source: runner.py RunOrchestrator._should_run and INFRASTRUCTURE_SECTIONS",
+          "expected": "Scope filter skips non-selected benchmark sections; infrastructure sections always run",
+          "observed": "INFRASTRUCTURE_SECTIONS (pre-flight, monitoring, post-flight, manifest) always run; BENCHMARK_SECTIONS (compute, memory, interconnect) filtered by scope set"
+        },
+        {
+          "action": "Examined source: cli.py run command scope flag parsing",
+          "expected": "CLI flags --compute-only, --memory-only, --interconnect-only map to scope set",
+          "observed": "scope_flags dict maps flag names to bools; active_scopes set built from enabled flags; passed to RunOrchestrator"
+        },
+        {
+          "action": "Run test: TestScopeControls::test_compute_only_runs_preflight_compute_postflight_manifest",
+          "expected": "With scope={compute}, only compute + infra sections run",
+          "observed": "PASSED — compute, pre-flight, post-flight all in non-skipped set"
+        },
+        {
+          "action": "Run test: TestScopeControls::test_memory_only_skips_compute_and_interconnect",
+          "expected": "With scope={memory}, compute and interconnect are skipped",
+          "observed": "PASSED — compute and interconnect in skipped set"
+        },
+        {
+          "action": "Run test: TestScopeControls::test_interconnect_only",
+          "expected": "With scope={interconnect}, compute and memory are skipped",
+          "observed": "PASSED — compute and memory in skipped set"
+        },
+        {
+          "action": "Run test: TestScopeControls::test_skipped_sections_explicitly_marked",
+          "expected": "Skipped sections have status=SKIPPED",
+          "observed": "PASSED — memory and interconnect have BenchmarkStatus.SKIPPED when scope={compute}"
+        },
+        {
+          "action": "Run test: TestScopeControls::test_no_scope_runs_all",
+          "expected": "Without scope filter, all sections execute",
+          "observed": "PASSED — no section has SKIPPED status"
+        },
+        {
+          "action": "Run test: TestScopeControls::test_multiple_scopes",
+          "expected": "scope={compute, memory} runs both, skips interconnect",
+          "observed": "PASSED — interconnect skipped, compute and memory not skipped"
+        },
+        {
+          "action": "Run tests: TestRunCommandCLI::test_run_with_compute_only_flag, test_run_with_memory_only_flag, test_run_with_interconnect_only_flag",
+          "expected": "CLI flags work without crash or traceback",
+          "observed": "All 3 PASSED — no Traceback in output"
+        }
+      ],
+      "evidence": {
+        "testResults": "20/20 passed in tests/cli/test_run_orchestration.py (includes 9 scope-specific tests)",
+        "sourceCode": "runner.py defines INFRASTRUCTURE_SECTIONS and BENCHMARK_SECTIONS; _should_run() enforces scope filtering; skipped sections get BenchmarkStatus.SKIPPED",
+        "consoleErrors": "none"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CLI-006",
+      "title": "Partial failure and timeout resilience",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Examined source: runner.py RunOrchestrator.execute() exception handling",
+          "expected": "Exceptions caught per-section, recorded as FAILED, execution continues",
+          "observed": "try/except around runner.run() catches Exception, creates FAILED SectionResult with error message; loop continues to next section"
+        },
+        {
+          "action": "Examined source: cli.py exit code logic",
+          "expected": "Exit code 2 for partial failure, 0 for success, 1 for no-GPU",
+          "observed": "cli.py: typer.Exit(code=2) when orch.has_failures, Exit(code=1) for no GPU, implicit 0 for success"
+        },
+        {
+          "action": "Run test: TestPartialFailureContinuation::test_compute_failure_continues_memory_and_interconnect",
+          "expected": "After compute fails, memory and interconnect still complete",
+          "observed": "PASSED — compute=FAILED, memory=COMPLETED, interconnect=COMPLETED"
+        },
+        {
+          "action": "Run test: TestPartialFailureContinuation::test_multiple_failures_still_completes_healthy_sections",
+          "expected": "Multiple failed sections don't abort healthy ones",
+          "observed": "PASSED — compute=FAILED, interconnect=FAILED, memory=COMPLETED, pre-flight=COMPLETED, post-flight=COMPLETED"
+        },
+        {
+          "action": "Run test: TestTimeoutHandling::test_timeout_section_marked_as_timeout",
+          "expected": "Timed-out section has status=TIMEOUT",
+          "observed": "PASSED — memory has BenchmarkStatus.TIMEOUT"
+        },
+        {
+          "action": "Run test: TestTimeoutHandling::test_timeout_continues_remaining_sections",
+          "expected": "After timeout, remaining sections still execute",
+          "observed": "PASSED — interconnect=COMPLETED after memory timeout"
+        },
+        {
+          "action": "Run test: TestExceptionSafety::test_exception_in_runner_caught_as_failure",
+          "expected": "Unexpected RuntimeError caught and recorded as FAILED with error message",
+          "observed": "PASSED — compute=FAILED, error is not None"
+        },
+        {
+          "action": "Run test: TestExceptionSafety::test_exception_does_not_abort_remaining",
+          "expected": "After exception, remaining sections still complete",
+          "observed": "PASSED — memory=COMPLETED, interconnect=COMPLETED"
+        },
+        {
+          "action": "Run test: TestFailureReporting::test_has_failures_true_when_section_fails",
+          "expected": "has_failures is True when any section fails",
+          "observed": "PASSED"
+        },
+        {
+          "action": "Run test: TestPartialFailureCLI::test_partial_failure_exit_code",
+          "expected": "CLI returns non-zero exit code on partial failure",
+          "observed": "PASSED — exit_code != 0"
+        },
+        {
+          "action": "Verified exact exit code value via direct invocation",
+          "expected": "Exit code is exactly 2 for partial failure",
+          "observed": "Confirmed: exit code = 2 for partial failure (direct Python invocation)"
+        },
+        {
+          "action": "Run test: TestPartialFailureCLI::test_partial_failure_no_traceback",
+          "expected": "No raw Python traceback in output on partial failure",
+          "observed": "PASSED — no 'Traceback' or 'raise ' in output"
+        },
+        {
+          "action": "Run test: TestPartialFailureCLI::test_partial_failure_report_still_written",
+          "expected": "JSON report written even on partial failure with failed section status",
+          "observed": "PASSED — report.json exists, compute section has status 'failed'"
+        },
+        {
+          "action": "Run test: TestPartialFailureCLI::test_partial_failure_shows_status_in_output",
+          "expected": "CLI output indicates which sections failed",
+          "observed": "PASSED — output contains 'fail' or ✗ or 'error'"
+        }
+      ],
+      "evidence": {
+        "testResults": "17/17 passed in tests/cli/test_partial_failure_flow.py",
+        "exitCodeVerification": "Direct invocation confirmed exit code = 2 for partial failure, 0 for success",
+        "sourceCode": "runner.py: exceptions caught per-section, recorded as FAILED, has_failures tracks failure/timeout. cli.py: Exit(code=2) on partial failure, no traceback exposed",
+        "consoleErrors": "none"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "Non-GPU macOS host cannot run `ornn-bench run` directly due to GPU guardrail (exit code 1). Tests required mocked GPU availability via unittest.mock.patch.",
+      "resolved": true,
+      "resolution": "Used automated test suite with mocked GPU tools as specified in task instructions. Also verified exact exit code via direct Python invocation with mocks.",
+      "affectedAssertions": ["VAL-CLI-004", "VAL-CLI-005", "VAL-CLI-006"]
+    },
+    {
+      "description": "test_partial_failure_exit_code asserts exit_code != 0 but doesn't explicitly verify exit_code == 2. Supplemented with direct invocation test.",
+      "resolved": true,
+      "resolution": "Direct Python invocation confirmed exit code is exactly 2 for partial failure, matching cli.py source (typer.Exit(code=2)).",
+      "affectedAssertions": ["VAL-CLI-006"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 3 assertions: 3 passed. All 37 tests (20 in test_run_orchestration.py + 17 in test_partial_failure_flow.py) pass. Source code confirms progress callbacks, JSON report generation, scope filtering with explicit SKIPPED status, partial failure continuation, no-traceback output, and exit code 2 for partial failure. Direct invocation verified exit code = 2."
+}

@@ -1,0 +1,69 @@
+{
+  "groupId": "runbook-coverage",
+  "testedAt": "2026-02-27T22:45:00Z",
+  "credentials": {
+    "account": "N/A (local test suite)",
+    "namespace": "tests/"
+  },
+  "toolsUsed": ["Execute", "Read", "Grep"],
+  "assertions": {
+    "VAL-RUNBOOK-001": {
+      "status": "pass",
+      "evidence": "tests/runbook/test_preflight_inventory.py: 24 tests covering GPU UUIDs (test_captures_gpu_uuids, test_parses_gpu_uuids), NVLink topology (test_captures_nvlink_topology, test_parses_nvlink_entries), driver/CUDA versions (test_captures_driver_version, test_captures_cuda_version), software versions (test_captures_software_versions), OS/kernel (test_captures_os_kernel), CPU model (test_captures_cpu_model), ECC baseline diagnostics (test_captures_ecc_baseline, test_parses_ecc_mode, test_parses_ecc_errors). PreflightRunner produces completed SectionResult with timestamps. Source: src/ornn_bench/runbook/preflight.py implements collect_preflight_inventory(). Fixtures: tests/fixtures/nvidia_smi/nvidia_smi_q.txt, nvlink_status.txt.",
+      "reason": "All pre-flight inventory elements (GPU UUIDs, NVLink topology/status, driver/CUDA/software versions, OS/kernel, CPU/NUMA, ECC baseline) are captured and verified by 24 passing tests."
+    },
+    "VAL-RUNBOOK-002": {
+      "status": "pass",
+      "evidence": "tests/runbook/test_compute_matrix.py: 26 tests covering all required dtypes BF16/FP8_E4M3/FP8_E5M2/FP16 (test_covers_required_dtypes, test_parses_fp8_e4m3/e5m2/fp16/bf16), fixed-shape checks (test_includes_fixed_shape_results, test_fixed_shape_with_fixture), per-GPU isolation via CUDA_VISIBLE_DEVICES (test_records_gpu_isolation, test_per_gpu_isolation_evidence), TF32 optional handling (test_tf32_optional_excluded_by_default, test_tf32_included_when_enabled). Source: REQUIRED_DTYPES constant in src/ornn_bench/runbook/compute.py. Fixtures: tests/fixtures/mamf_finder/ with bf16_range.txt, fp8_e4m3_range.txt, fp8_e5m2_range.txt, fp16_range.txt, fixed_shape.txt.",
+      "reason": "All required dtypes (BF16, FP8 E4M3, FP8 E5M2, FP16; TF32 optional), fixed-shape checks, and per-GPU isolation evidence (CUDA_VISIBLE_DEVICES) are tested and verified across 26 passing tests."
+    },
+    "VAL-RUNBOOK-003": {
+      "status": "pass",
+      "evidence": "tests/runbook/test_memory_matrix.py: 27 tests covering all 7 required nvbandwidth tests (device_local_copy, device_local_copy_sm, h2d, d2h, d2d_read, d2d_write, d2d_bidir) verified in test_runs_all_required_tests which asserts set(REQUIRED_TESTS)==set(result['tests_run']), individual presence tests for each test type, plus PyTorch D2D cross-validation (test_includes_pytorch_crossval, test_mock_result_accepted). Source: REQUIRED_TESTS in src/ornn_bench/runbook/memory.py. Fixtures: tests/fixtures/nvbandwidth/ with 7 JSON fixture files.",
+      "reason": "All 7 required nvbandwidth tests plus PyTorch D2D cross-validation are covered with explicit per-test presence verification across 27 passing tests."
+    },
+    "VAL-RUNBOOK-004": {
+      "status": "pass",
+      "evidence": "tests/runbook/test_interconnect_matrix.py: 29 tests covering all 6 NCCL tests (all_reduce_sweep, all_reduce_1gb, reduce_scatter, all_gather, broadcast, sendrecv) verified in test_runs_all_required_tests asserting set(REQUIRED_NCCL_TESTS)==set(result['tests_run']), individual presence tests, bus bandwidth capture (test_bus_bandwidth_summary_present, test_bus_bandwidth_captured checking avg_busbw and max_busbw). Source: REQUIRED_NCCL_TESTS in src/ornn_bench/runbook/interconnect.py. Fixtures: tests/fixtures/nccl_tests/ with 6 fixture files.",
+      "reason": "All 6 required NCCL tests and bus bandwidth outputs are tested with explicit coverage across 29 passing tests."
+    },
+    "VAL-RUNBOOK-005": {
+      "status": "pass",
+      "evidence": "tests/runbook/test_monitoring_and_postflight.py: 24 monitoring-related tests covering continuous time-series capture (test_contains_time_series via dmon_output.txt parser with power_w, gpu_temp_c, sm_util_pct, mem_util_pct, clocks), pre/post snapshots (test_contains_pre_snapshot, test_contains_post_snapshot), XID error detection (test_contains_xid_detection, test_detects_xid_errors, test_parses_specific_codes for XID 48/63, test_xid_clear_when_no_errors). MonitoringRunner has timestamps. Source: src/ornn_bench/runbook/monitoring.py. Fixtures: nvidia_smi/dmon_output.txt, xid_errors.txt, xid_errors_none.txt.",
+      "reason": "Monitoring tests verify continuous thermal/power time-series capture (dmon), pre/post snapshots, and XID detection across 24 passing tests."
+    },
+    "VAL-RUNBOOK-006": {
+      "status": "pass",
+      "evidence": "tests/runbook/test_monitoring_and_postflight.py: 19 post-flight tests covering UUID consistency (test_consistent_uuids_pass, test_missing_uuid_fails, test_new_uuid_fails), NVLink status (test_all_active_links_pass, test_reports_inactive_links), ECC errors (test_zero_errors_pass, test_reports_new_errors), explicit pass/fail (test_has_explicit_pass_fail, test_overall_pass_when_all_pass, test_overall_fail_when_any_fails). PostflightRunner produces SectionResult with uuid_consistency, nvlink_status, ecc_errors, overall_passed in metrics. Source: src/ornn_bench/runbook/postflight.py.",
+      "reason": "Post-flight UUID consistency, NVLink error check, and ECC error check are all tested with explicit pass/fail reporting across 19 passing tests."
+    },
+    "VAL-RUNBOOK-007": {
+      "status": "pass",
+      "evidence": "tests/cli/test_run_orchestration.py: TestSectionOrdering class with 5 tests: test_section_order_is_defined (SECTION_ORDER has >=4 entries), test_preflight_comes_first (index 0), test_postflight_comes_after_benchmarks (post-flight index > compute/memory/interconnect), test_manifest_is_last (last index), test_orchestrator_runs_in_order (wrapper validates call_order == list(SECTION_ORDER)). test_results_have_timestamps verifies started_at/finished_at on completed sections. Source: SECTION_ORDER tuple in runner.py = ('pre-flight','compute','memory','interconnect','monitoring','post-flight','manifest').",
+      "reason": "Deterministic ordered execution (pre-flight → benchmarks → monitoring → post-flight → manifest) is enforced by SECTION_ORDER constant and verified by orchestrator call-order tracking and timestamp tests across 6 passing tests."
+    },
+    "VAL-RUNBOOK-008": {
+      "status": "pass",
+      "evidence": "tests/runbook/test_manifest_and_durability.py: TestManifestBuilder class with 6 tests: test_records_produced_artifact (PRODUCED status), test_records_skipped_artifact (SKIPPED with reason), test_records_missing_artifact (MISSING with reason), test_to_dict_format (serialization with summary counts), test_build_from_sections (auto-building from SectionResults including skipped/failed entries). TestManifestRunner: 3 tests verifying runner produces completed SectionResult with entries + summary. Source: ManifestBuilder/ManifestRunner in src/ornn_bench/runbook/manifest.py.",
+      "reason": "Manifest builder explicitly tracks produced/skipped/missing artifacts with reasons. Build-from-sections auto-categorizes completed, skipped, and failed sections. Verified across 9 passing tests."
+    },
+    "VAL-RUNBOOK-009": {
+      "status": "pass",
+      "evidence": "tests/runbook/test_manifest_and_durability.py: TestDurableRunOrchestrator class with 5 tests: test_persists_on_normal_completion (output_path.exists + valid JSON), test_persists_completed_sections_on_failure (pre-flight/compute completed when memory fails, interconnect still completes), test_persists_on_keyboard_interrupt (pre-flight/compute persisted when memory interrupted), test_incremental_persistence (all section names present including failed), test_report_has_terminal_status_on_interruption (interrupted section marked 'failed' with 'interrupted' in error). Source: DurableRunOrchestrator in runner.py uses _persist_current_state() after each section, catches KeyboardInterrupt.",
+      "reason": "Durable orchestrator persists incrementally after each section. Completed sections survive failures and interruptions. Terminal status is explicit. Verified across 5 passing tests."
+    },
+    "VAL-RUNBOOK-010": {
+      "status": "pass",
+      "evidence": "tests/scoring/test_formula_and_aggregation.py: TestPerGPUScoring class with 7 tests: test_single_gpu_aggregate_is_identity, test_multi_gpu_uses_minimum (worst-GPU gate), test_per_gpu_records_preserved (gpu_uuid preserved), test_aggregate_method_explicitly_recorded (AggregateMethod.MINIMUM), test_multi_gpu_qualification_uses_aggregate, test_empty_gpu_list (ERROR status), test_multi_gpu_with_partial_metrics (PARTIAL status). Source: aggregate_gpu_scores() in scoring.py produces ScoreResult with per_gpu_scores list and aggregate_method='minimum'. Models: PerGPUScoreRecord with gpu_uuid, ornn_i, ornn_t, components.",
+      "reason": "Multi-GPU aggregation uses minimum (worst-GPU) gate. Per-GPU records are preserved with gpu_uuid. Aggregate method is explicitly documented as 'minimum'. Verified across 7+ passing tests."
+    },
+    "VAL-RUNBOOK-011": {
+      "status": "pass",
+      "evidence": "tests/scoring/test_invalid_metric_paths.py: 33 tests across 5 classes: TestMissingMetricValues (None inputs → None scores), TestInvalidReferenceValues (zero/negative refs → None), TestNaNAndInfInputs (NaN/Inf → None, never silent NaN), TestNegativeMetricValues (negative → None), TestScoreStatusExplicitness (VALID/PARTIAL/ERROR status, score_status_detail populated, test_score_never_nan core invariant). TestAggregationWithInvalidGPUs: 4 tests for all-invalid, partial-invalid, NaN metrics in multi-GPU. Source: _is_valid_metric() and _is_valid_ref() in scoring.py reject None/NaN/Inf/negative. compute_scores() returns explicit ScoreStatus.ERROR/PARTIAL.",
+      "reason": "Scoring deterministically rejects None/NaN/Inf/negative inputs producing None (not NaN). ScoreStatus explicitly tracks VALID/PARTIAL/ERROR. test_score_never_nan proves the core invariant. Verified across 33 passing tests."
+    }
+  },
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 11 assertions (VAL-RUNBOOK-001 through VAL-RUNBOOK-011): all 11 passed. Full test suite: 387/387 tests passed (0 failures). All runbook assertions are covered by dedicated test files with fixture-based mocking of GPU tools. Implementation in src/ornn_bench/runbook/, runner.py, and scoring.py matches specification requirements."
+}

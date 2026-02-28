@@ -1,0 +1,37 @@
+{
+  "milestone": "core-cli",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CLI-002",
+    "VAL-CLI-003",
+    "VAL-CLI-004",
+    "VAL-CLI-005",
+    "VAL-CLI-006",
+    "VAL-CLI-007",
+    "VAL-CLI-008",
+    "VAL-CLI-010",
+    "VAL-CLI-011",
+    "VAL-RUNBOOK-001",
+    "VAL-RUNBOOK-002",
+    "VAL-RUNBOOK-003",
+    "VAL-RUNBOOK-004",
+    "VAL-RUNBOOK-005",
+    "VAL-RUNBOOK-006",
+    "VAL-RUNBOOK-007",
+    "VAL-RUNBOOK-008",
+    "VAL-RUNBOOK-009",
+    "VAL-RUNBOOK-010",
+    "VAL-RUNBOOK-011"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null
+}
