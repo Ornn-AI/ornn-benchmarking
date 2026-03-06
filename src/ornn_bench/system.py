@@ -162,6 +162,19 @@ def probe_nvidia_smi() -> GPUProbeResult:
     return result
 
 
+def detect_gpu_count(default: int = 1) -> int:
+    """Detect the number of NVIDIA GPUs via ``nvidia-smi``.
+
+    Returns the probed count when available, otherwise falls back to
+    ``default`` so local fixture-driven tests and non-GPU environments
+    remain deterministic.
+    """
+    result = probe_nvidia_smi()
+    if result.detected and result.gpu_count > 0:
+        return result.gpu_count
+    return default
+
+
 def probe_tool(
     name: str,
     cmd: list[str],

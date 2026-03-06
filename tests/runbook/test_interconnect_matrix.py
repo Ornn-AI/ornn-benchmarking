@@ -10,6 +10,7 @@ Validates VAL-RUNBOOK-004:
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from ornn_bench.models import BenchmarkStatus
 from ornn_bench.runbook.interconnect import (
@@ -86,6 +87,14 @@ class TestNcclParser:
         assert len(result["results"]) == 1
         assert result["avg_bus_bandwidth"] == 18.54
 
+    def test_parses_8gpu_fixed_run_fixture(self) -> None:
+        """VAL-CROSS-003: parser handles full-node all-reduce fixture."""
+        raw = _load_fixture("nccl_tests/all_reduce_1gb_8gpu.txt")
+        result = parse_nccl_output(raw)
+        assert result["gpu_count"] == 8
+        assert len(result["devices"]) == 8
+        assert result["avg_bus_bandwidth"] == 148.32
+
     def test_parses_reduce_scatter(self) -> None:
         raw = _load_fixture("nccl_tests/reduce_scatter.txt")
         result = parse_nccl_output(raw)
@@ -134,6 +143,29 @@ class TestRunNcclTest:
         assert result["test_key"] == "all_reduce_1gb"
         assert result["avg_bus_bandwidth"] == 18.54
 
+    def test_all_reduce_1gb_uses_g8_argv_for_8gpu_node(self) -> None:
+        """VAL-CORE-002: all_reduce_perf argv includes -g 8 on 8-GPU nodes."""
+        captured_cmds: list[list[str]] = []
+
+        def fake_run_cmd(
+            cmd: list[str],
+            *,
+            timeout: int = 600,
+            env: dict[str, str] | None = None,
+        ) -> tuple[int, str, str]:
+            del timeout, env
+            captured_cmds.append(cmd)
+            return 0, _load_fixture("nccl_tests/all_reduce_1gb_8gpu.txt"), ""
+
+        with patch("ornn_bench.runbook.interconnect._run_cmd", side_effect=fake_run_cmd):
+            result = run_nccl_test("all_reduce_1gb", gpu_count=8)
+
+        assert captured_cmds == [["all_reduce_perf", "-b", "1G", "-e", "1G", "-n", "100", "-g", "8"]]
+        assert result["gpu_count"] == 8
+        assert result["observed_gpu_count"] == 8
+        assert result["argv"] == captured_cmds[0]
+        assert len(result["devices"]) == 8
+
     def test_reduce_scatter_with_fixture(self) -> None:
         raw = _load_fixture("nccl_tests/reduce_scatter.txt")
         result = run_nccl_test("reduce_scatter", raw_output=raw)
@@ -163,6 +195,30 @@ class TestCollectInterconnectMatrix:
         """VAL-RUNBOOK-004: All required NCCL tests run."""
         result = collect_interconnect_matrix(test_outputs=_all_nccl_fixtures())
         assert set(REQUIRED_NCCL_TESTS) == set(result["tests_run"])
+
+    def test_detected_gpu_count_is_recorded(self) -> None:
+        """VAL-CORE-002: detection path records full-node GPU count."""
+        with patch("ornn_bench.runbook.interconnect.detect_gpu_count", return_value=8):
+            result = collect_interconnect_matrix(
+                test_outputs={
+                    **_all_nccl_fixtures(),
+                    "all_reduce_1gb": _load_fixture("nccl_tests/all_reduce_1gb_8gpu.txt"),
+                }
+            )
+
+        assert result["gpu_count"] == 8
+        assert result["nccl_results"]["all_reduce_1gb"]["gpu_count"] == 8
+        assert result["nccl_results"]["all_reduce_1gb"]["observed_gpu_count"] == 8
+        assert result["nccl_results"]["all_reduce_1gb"]["argv"] == [
+            "all_reduce_perf", "-b", "1G", "-e", "1G", "-n", "100", "-g", "8"
+        ]
+
+    def test_injected_gpu_count_drives_all_nccl_commands(self) -> None:
+        """VAL-CORE-002: no runtime NCCL path falls back to hardcoded -g 2."""
+        result = collect_interconnect_matrix(gpu_count=8, test_outputs=_all_nccl_fixtures())
+
+        for test_name in REQUIRED_NCCL_TESTS:
+            assert result["nccl_results"][test_name]["argv"][-2:] == ["-g", "8"]
 
     def test_all_reduce_sweep_present(self) -> None:
         result = collect_interconnect_matrix(test_outputs=_all_nccl_fixtures())
