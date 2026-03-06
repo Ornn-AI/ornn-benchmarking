@@ -168,12 +168,15 @@ def _build_benchmark_report(
     sections: list[SectionResult],
 ) -> BenchmarkReport:
     """Construct the benchmark report with derived top-level sections."""
+    from ornn_bench.scoring import derive_scores_from_sections
+
     return BenchmarkReport(
         schema_version="1.0.0",
         report_id=report_id,
         created_at=created_at,
         system_inventory=_derive_system_inventory(sections),
         sections=sections,
+        scores=derive_scores_from_sections(sections),
         manifest=_derive_manifest(sections),
     )
 
