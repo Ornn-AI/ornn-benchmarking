@@ -139,3 +139,31 @@ Use the `tuistory` skill for TUI/terminal interaction, or direct shell execution
 - Live progress bars during benchmark run
 - Real GPU metrics and actual scoring from live data
 - These are validated through automated unit tests with mocked subprocess calls
+
+## Flow Validator Guidance: Bench Infra Shell
+
+### Testing tool
+Use direct shell execution via the Execute tool. Prefer `bash -n`, shell sourcing, and targeted `pytest` runs over live provisioning because this local host is macOS and does not provide Linux apt/NVIDIA tooling.
+
+### Setup
+- Use the repo venv at `./.venv`
+- Use a unique pytest temp root per subagent: `--basetemp=/tmp/<namespace>`
+- Use a unique campaign/output root per subagent when exercising `benchmark_node.sh` tests: `ORNN_BENCH_OUTPUT_ROOT=/tmp/<namespace>/output`
+- On macOS, paths under `/tmp/...` may resolve to `/private/tmp/...`; inspect generated pytest artifacts via the resolved path if needed
+
+### Isolation rules
+- Do not modify repository source files or fixtures
+- Do not run `ornn-bench-infra/provision.sh` live on this macOS host; validate it through shell parsing plus `tests/infra/test_bench_infra_layout.py`
+- Keep all temporary files under your assigned namespace only
+- When executing benchmark-node integration tests, rely on the existing stub harness in `tests/infra/test_benchmark_node_runner.py`
+
+### What is testable on this host
+- `source ornn-bench-infra/toolchain.env` succeeds and exposes pinned values
+- `bash -n ornn-bench-infra/provision.sh` and `bash -n ornn-bench-infra/benchmark_node.sh`
+- `tests/infra/test_bench_infra_layout.py` for layout/toolchain/provision invariants
+- `tests/infra/test_benchmark_node_runner.py` for stubbed `benchmark_node.sh` execution, upload gating, SXM5 gate failures, and report recovery behavior
+
+### What is not testable on this host
+- Real Linux provisioning with apt, root privileges, CUDA toolkit installs, or NCCL package availability
+- Real NVIDIA hardware checks via local `nvidia-smi`, `nvbandwidth`, or `nccl-tests`
+- These behaviors must be validated indirectly through the stubbed shell tests and static script assertions in `tests/infra/`

@@ -1,0 +1,275 @@
+{
+  "groupId": "layout-provision",
+  "testedAt": "2026-03-06T05:02:44Z",
+  "credentials": {
+    "account": "local-shell-layout",
+    "namespace": "benchinfra-layout"
+  },
+  "toolsUsed": [
+    "LS",
+    "Read",
+    "Execute",
+    "bash",
+    "pytest"
+  ],
+  "assertions": [
+    {
+      "id": "VAL-INFRA-001",
+      "title": "Campaign folder layout exists",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "List /Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra and inspect the top-level layout.",
+          "expected": "toolchain.env, provision.sh, benchmark_node.sh, and provider-notes/ all exist.",
+          "observed": "LS showed toolchain.env, provision.sh, benchmark_node.sh, and provider-notes/ under ornn-bench-infra/."
+        },
+        {
+          "action": "Run the targeted pytest selector covering required bench-infra files.",
+          "expected": "tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_required_top_level_files_exist passes.",
+          "observed": "The selector passed inside the targeted pytest run; overall result was 11 passed in 0.02s."
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "LS /Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra",
+          "\"/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python\" -m pytest -vv --basetemp=\"/tmp/benchinfra-layout-pytest\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_required_top_level_files_exist\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_provider_notes_exist_for_primary_clouds\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_declares_immutability\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_has_required_pin_values\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_uses_full_shas_for_repo_pins\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_use_strict_bash_headers\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_are_executable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_sources_toolchain_lock_and_writes_runtime_env\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_installs_and_verifies_pinned_toolchain_components\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_hard_fails_when_pinned_nccl_packages_are_unavailable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_do_not_mutate_toolchain_lock\""
+        ],
+        "observedFiles": [
+          "ornn-bench-infra/toolchain.env",
+          "ornn-bench-infra/provision.sh",
+          "ornn-bench-infra/benchmark_node.sh",
+          "ornn-bench-infra/provider-notes/"
+        ],
+        "pytestSelectorsCovered": [
+          "TestBenchInfraLayout::test_required_top_level_files_exist"
+        ],
+        "pytestSummary": "11 passed in 0.02s"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-INFRA-002",
+      "title": "toolchain.env is shell-sourceable and immutable by convention",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Source /Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra/toolchain.env in a shell and print representative pinned values.",
+          "expected": "The file sources cleanly and exports shell variables without syntax errors.",
+          "observed": "The shell printed ORNN_BENCH_VERSION=0.1.0, NVBANDWIDTH_TAG=v0.8, MAMF_FINDER_COMMIT=7c660da71e533fdb5de141591379d3c8070ef272, and NCCL_TESTS_COMMIT=ae98985f5599617be94042f4aa3637d10014ce89."
+        },
+        {
+          "action": "Inspect the file header and run the targeted pytest selectors for immutability and required pin keys.",
+          "expected": "The file contains an immutable-at-runtime comment and all required KEY=VALUE pins.",
+          "observed": "The header says the file is immutable at runtime and scripts must not modify or append to it; both pytest selectors passed within the targeted run."
+        }
+      ],
+      "evidence": {
+        "commands": [
+          ". \"/Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra/toolchain.env\" && printf 'ORNN_BENCH_VERSION=%s\\nNVBANDWIDTH_TAG=%s\\nMAMF_FINDER_COMMIT=%s\\nNCCL_TESTS_COMMIT=%s\\n' \"$ORNN_BENCH_VERSION\" \"$NVBANDWIDTH_TAG\" \"$MAMF_FINDER_COMMIT\" \"$NCCL_TESTS_COMMIT\"",
+          "\"/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python\" -m pytest -vv --basetemp=\"/tmp/benchinfra-layout-pytest\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_required_top_level_files_exist\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_provider_notes_exist_for_primary_clouds\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_declares_immutability\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_has_required_pin_values\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_uses_full_shas_for_repo_pins\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_use_strict_bash_headers\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_are_executable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_sources_toolchain_lock_and_writes_runtime_env\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_installs_and_verifies_pinned_toolchain_components\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_hard_fails_when_pinned_nccl_packages_are_unavailable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_do_not_mutate_toolchain_lock\""
+        ],
+        "sourceOutput": [
+          "ORNN_BENCH_VERSION=0.1.0",
+          "NVBANDWIDTH_TAG=v0.8",
+          "MAMF_FINDER_COMMIT=7c660da71e533fdb5de141591379d3c8070ef272",
+          "NCCL_TESTS_COMMIT=ae98985f5599617be94042f4aa3637d10014ce89"
+        ],
+        "pytestSelectorsCovered": [
+          "TestToolchainEnv::test_toolchain_env_declares_immutability",
+          "TestToolchainEnv::test_toolchain_env_has_required_pin_values"
+        ],
+        "pytestSummary": "11 passed in 0.02s"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-INFRA-003",
+      "title": "toolchain pins reflect resolved SHAs for external repos",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect /Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra/toolchain.env for the repository pin values.",
+          "expected": "MAMF_FINDER_COMMIT and NCCL_TESTS_COMMIT are full 40-character SHAs and NVBANDWIDTH_TAG is v0.8.",
+          "observed": "toolchain.env declares MAMF_FINDER_COMMIT=7c660da71e533fdb5de141591379d3c8070ef272, NCCL_TESTS_COMMIT=ae98985f5599617be94042f4aa3637d10014ce89, and NVBANDWIDTH_TAG=v0.8."
+        },
+        {
+          "action": "Run the targeted pytest selectors for required pin values and full SHA validation.",
+          "expected": "The pin-value and full-SHA assertions pass.",
+          "observed": "Both selectors passed in the targeted pytest run; overall result was 11 passed in 0.02s."
+        }
+      ],
+      "evidence": {
+        "commands": [
+          ". \"/Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra/toolchain.env\" && printf 'ORNN_BENCH_VERSION=%s\\nNVBANDWIDTH_TAG=%s\\nMAMF_FINDER_COMMIT=%s\\nNCCL_TESTS_COMMIT=%s\\n' \"$ORNN_BENCH_VERSION\" \"$NVBANDWIDTH_TAG\" \"$MAMF_FINDER_COMMIT\" \"$NCCL_TESTS_COMMIT\"",
+          "\"/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python\" -m pytest -vv --basetemp=\"/tmp/benchinfra-layout-pytest\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_required_top_level_files_exist\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_provider_notes_exist_for_primary_clouds\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_declares_immutability\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_has_required_pin_values\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_uses_full_shas_for_repo_pins\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_use_strict_bash_headers\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_are_executable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_sources_toolchain_lock_and_writes_runtime_env\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_installs_and_verifies_pinned_toolchain_components\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_hard_fails_when_pinned_nccl_packages_are_unavailable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_do_not_mutate_toolchain_lock\""
+        ],
+        "pinValues": {
+          "MAMF_FINDER_COMMIT": "7c660da71e533fdb5de141591379d3c8070ef272",
+          "NCCL_TESTS_COMMIT": "ae98985f5599617be94042f4aa3637d10014ce89",
+          "NVBANDWIDTH_TAG": "v0.8"
+        },
+        "pytestSelectorsCovered": [
+          "TestToolchainEnv::test_toolchain_env_has_required_pin_values",
+          "TestToolchainEnv::test_toolchain_env_uses_full_shas_for_repo_pins"
+        ],
+        "pytestSummary": "11 passed in 0.02s"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-INFRA-004",
+      "title": "provision.sh sources toolchain.env and writes runtime.env separately",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run bash -n against provision.sh.",
+          "expected": "The script parses successfully without executing provisioning steps.",
+          "observed": "bash -n returned success and printed 'provision.sh: syntax ok'."
+        },
+        {
+          "action": "Inspect provision.sh for the toolchain source line, runtime.env path, and write path behavior.",
+          "expected": "The script sources ${TOOLCHAIN_ENV}, writes discovered paths to /opt/ornn-bench-tools/runtime.env, and does not write back to toolchain.env.",
+          "observed": "provision.sh contains 'source \"${TOOLCHAIN_ENV}\"', sets readonly RUNTIME_ENV=\"${TOOLS_ROOT}/runtime.env\", and writes the generated file via mv \"${temp_env}\" \"${RUNTIME_ENV}\"."
+        },
+        {
+          "action": "Run the targeted pytest selectors for runtime.env writing and lock-file non-mutation.",
+          "expected": "The static assertions pass.",
+          "observed": "Both selectors passed within the targeted pytest run; overall result was 11 passed in 0.02s."
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "bash -n \"/Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra/provision.sh\" && echo \"provision.sh: syntax ok\"",
+          "\"/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python\" -m pytest -vv --basetemp=\"/tmp/benchinfra-layout-pytest\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_required_top_level_files_exist\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_provider_notes_exist_for_primary_clouds\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_declares_immutability\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_has_required_pin_values\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_uses_full_shas_for_repo_pins\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_use_strict_bash_headers\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_are_executable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_sources_toolchain_lock_and_writes_runtime_env\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_installs_and_verifies_pinned_toolchain_components\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_hard_fails_when_pinned_nccl_packages_are_unavailable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_do_not_mutate_toolchain_lock\""
+        ],
+        "staticFindings": [
+          "source \"${TOOLCHAIN_ENV}\"",
+          "readonly RUNTIME_ENV=\"${TOOLS_ROOT}/runtime.env\"",
+          "mv \"${temp_env}\" \"${RUNTIME_ENV}\"",
+          "No write/append patterns targeting toolchain.env were present."
+        ],
+        "pytestSelectorsCovered": [
+          "TestProvisionScript::test_sources_toolchain_lock_and_writes_runtime_env",
+          "TestShellScripts::test_scripts_do_not_mutate_toolchain_lock"
+        ],
+        "pytestSummary": "11 passed in 0.02s"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-INFRA-005",
+      "title": "provision.sh enforces pinned versions and hard-fails on NCCL pin mismatch",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect provision.sh for pinned install commands and explicit NCCL availability checks.",
+          "expected": "The script pins ornn-bench, torch, mamf-finder, nvbandwidth, nccl-tests, libnccl2, and libnccl-dev, and it contains an actionable non-zero failure path when pinned NCCL packages are unavailable.",
+          "observed": "provision.sh installs \"ornn-bench==${ORNN_BENCH_VERSION}\", \"torch==${TORCH_VERSION}\", uses pinned git refs for mamf-finder and nccl-tests, pins libnccl2/libnccl-dev to ${NCCL_DEV_VERSION}, and fails with a message directing the operator to configure the NVIDIA CUDA apt repository if the pinned NCCL packages are unavailable."
+        },
+        {
+          "action": "Run the targeted pytest selectors for pinned component installation and NCCL hard-fail messaging.",
+          "expected": "Both selectors pass.",
+          "observed": "Both selectors passed inside the targeted pytest run; overall result was 11 passed in 0.02s."
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "\"/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python\" -m pytest -vv --basetemp=\"/tmp/benchinfra-layout-pytest\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_required_top_level_files_exist\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_provider_notes_exist_for_primary_clouds\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_declares_immutability\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_has_required_pin_values\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_uses_full_shas_for_repo_pins\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_use_strict_bash_headers\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_are_executable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_sources_toolchain_lock_and_writes_runtime_env\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_installs_and_verifies_pinned_toolchain_components\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_hard_fails_when_pinned_nccl_packages_are_unavailable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_do_not_mutate_toolchain_lock\""
+        ],
+        "staticFindings": [
+          "\"ornn-bench==${ORNN_BENCH_VERSION}\"",
+          "\"torch==${TORCH_VERSION}\"",
+          "sync_git_checkout \"${MAMF_FINDER_REPO}\" \"${MAMF_REPO_DIR}\" \"${MAMF_FINDER_COMMIT}\"",
+          "sync_git_checkout \"${NCCL_TESTS_REPO}\" \"${NCCL_TESTS_REPO_DIR}\" \"${NCCL_TESTS_COMMIT}\"",
+          "\"libnccl2=${NCCL_DEV_VERSION}\"",
+          "\"libnccl-dev=${NCCL_DEV_VERSION}\"",
+          "Pinned ${package_label} package ${package_name}=${version} is unavailable. Ensure the NVIDIA CUDA apt repository for CUDA ${CUDA_VERSION} is configured on this image, then re-run provision.sh."
+        ],
+        "pytestSelectorsCovered": [
+          "TestProvisionScript::test_installs_and_verifies_pinned_toolchain_components",
+          "TestProvisionScript::test_hard_fails_when_pinned_nccl_packages_are_unavailable"
+        ],
+        "pytestSummary": "11 passed in 0.02s",
+        "hostConstraint": "Per the bench infra shell guidance, provision.sh was validated via syntax parsing and static tests only; it was not executed on this macOS host."
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-INFRA-011",
+      "title": "Provider notes placeholders exist for primary providers",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "List /Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra/provider-notes.",
+          "expected": "Placeholder markdown files exist for AWS, GCP, Azure, and Oracle.",
+          "observed": "LS showed aws.md, azure.md, gcp.md, and oracle.md in provider-notes/."
+        },
+        {
+          "action": "Run the targeted pytest selector for provider-note placeholders.",
+          "expected": "The selector passes and confirms the files mention the provider and placeholder text.",
+          "observed": "The selector passed inside the targeted pytest run; overall result was 11 passed in 0.02s."
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "LS /Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra/provider-notes",
+          "\"/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python\" -m pytest -vv --basetemp=\"/tmp/benchinfra-layout-pytest\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_required_top_level_files_exist\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_provider_notes_exist_for_primary_clouds\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_declares_immutability\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_has_required_pin_values\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_uses_full_shas_for_repo_pins\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_use_strict_bash_headers\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_are_executable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_sources_toolchain_lock_and_writes_runtime_env\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_installs_and_verifies_pinned_toolchain_components\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_hard_fails_when_pinned_nccl_packages_are_unavailable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_do_not_mutate_toolchain_lock\""
+        ],
+        "observedFiles": [
+          "ornn-bench-infra/provider-notes/aws.md",
+          "ornn-bench-infra/provider-notes/gcp.md",
+          "ornn-bench-infra/provider-notes/azure.md",
+          "ornn-bench-infra/provider-notes/oracle.md"
+        ],
+        "pytestSelectorsCovered": [
+          "TestBenchInfraLayout::test_provider_notes_exist_for_primary_clouds"
+        ],
+        "pytestSummary": "11 passed in 0.02s"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-INFRA-012",
+      "title": "Scripts are executable and use strict bash mode",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "List /Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra and inspect script modes.",
+          "expected": "provision.sh and benchmark_node.sh are executable.",
+          "observed": "LS showed both scripts as -rwxr-xr-x."
+        },
+        {
+          "action": "Run bash -n against provision.sh and benchmark_node.sh.",
+          "expected": "Both scripts parse successfully under bash.",
+          "observed": "bash -n returned success for both scripts and printed 'provision.sh: syntax ok' and 'benchmark_node.sh: syntax ok'."
+        },
+        {
+          "action": "Run the targeted pytest selectors for strict bash headers and executable bits.",
+          "expected": "Both selectors pass.",
+          "observed": "Both selectors passed within the targeted pytest run; overall result was 11 passed in 0.02s."
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "LS /Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra",
+          "bash -n \"/Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra/provision.sh\" && echo \"provision.sh: syntax ok\"",
+          "bash -n \"/Users/kushbavaria/Documents/ornn-benchmarking/ornn-bench-infra/benchmark_node.sh\" && echo \"benchmark_node.sh: syntax ok\"",
+          "\"/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python\" -m pytest -vv --basetemp=\"/tmp/benchinfra-layout-pytest\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_required_top_level_files_exist\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestBenchInfraLayout::test_provider_notes_exist_for_primary_clouds\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_declares_immutability\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_has_required_pin_values\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestToolchainEnv::test_toolchain_env_uses_full_shas_for_repo_pins\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_use_strict_bash_headers\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_are_executable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_sources_toolchain_lock_and_writes_runtime_env\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_installs_and_verifies_pinned_toolchain_components\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestProvisionScript::test_hard_fails_when_pinned_nccl_packages_are_unavailable\" \"/Users/kushbavaria/Documents/ornn-benchmarking/tests/infra/test_bench_infra_layout.py::TestShellScripts::test_scripts_do_not_mutate_toolchain_lock\""
+        ],
+        "observedModes": {
+          "ornn-bench-infra/provision.sh": "-rwxr-xr-x",
+          "ornn-bench-infra/benchmark_node.sh": "-rwxr-xr-x"
+        },
+        "pytestSelectorsCovered": [
+          "TestShellScripts::test_scripts_use_strict_bash_headers",
+          "TestShellScripts::test_scripts_are_executable"
+        ],
+        "pytestSummary": "11 passed in 0.02s"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Validated 7 bench-infra layout/provision assertions through repository inspection, bash syntax checks, shell sourcing, and targeted pytest on this macOS host. All 7 assigned assertions passed; no live provisioning was executed per the bench infra shell guidance."
+}
