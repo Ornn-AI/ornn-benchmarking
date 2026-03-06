@@ -9,6 +9,7 @@ Validates VAL-RUNBOOK-002:
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from ornn_bench.models import BenchmarkStatus
 from ornn_bench.runbook.compute import (
@@ -187,6 +188,22 @@ class TestCollectComputeMatrix:
         )
         assert "gpu_0" in result["per_gpu"]
         assert "gpu_1" in result["per_gpu"]
+
+    def test_detected_gpu_count_runs_all_detected_gpus(self) -> None:
+        """VAL-CORE-001: Detection path fans out compute across all GPUs."""
+        with patch("ornn_bench.runbook.compute.detect_gpu_count", return_value=8):
+            result = collect_compute_matrix(
+                dtype_outputs=self._dtype_outputs(),
+                fixed_shape_outputs={"bf16": _load_fixture("mamf_finder/fixed_shape.txt")},
+            )
+
+        assert result["gpu_count"] == 8
+        assert set(result["per_gpu"]) == {f"gpu_{index}" for index in range(8)}
+        for index in range(8):
+            gpu_key = f"gpu_{index}"
+            assert result["fixed_shape_results"][gpu_key]["cuda_visible_devices"] == str(index)
+            for dtype in REQUIRED_DTYPES:
+                assert result["per_gpu"][gpu_key][dtype]["cuda_visible_devices"] == str(index)
 
     def test_each_gpu_has_all_dtypes(self) -> None:
         """VAL-RUNBOOK-002: Each GPU has results for all dtypes."""

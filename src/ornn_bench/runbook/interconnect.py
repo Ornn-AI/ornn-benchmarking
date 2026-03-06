@@ -15,6 +15,7 @@ from typing import Any
 from ornn_bench.models import BenchmarkStatus, SectionResult
 from ornn_bench.runbook.parsers import parse_nccl_output
 from ornn_bench.runner import SectionRunner
+from ornn_bench.system import detect_gpu_count
 
 #: Required NCCL test matrix per Section 8.3
 REQUIRED_NCCL_TESTS: tuple[str, ...] = (
@@ -30,29 +31,39 @@ REQUIRED_NCCL_TESTS: tuple[str, ...] = (
 NCCL_TEST_CONFIG: dict[str, dict[str, Any]] = {
     "all_reduce_sweep": {
         "binary": "all_reduce_perf",
-        "args": ["-b", "8", "-e", "1G", "-f", "2", "-g", "2"],
+        "args": ["-b", "8", "-e", "1G", "-f", "2"],
     },
     "all_reduce_1gb": {
         "binary": "all_reduce_perf",
-        "args": ["-b", "1G", "-e", "1G", "-n", "100", "-g", "2"],
+        "args": ["-b", "1G", "-e", "1G", "-n", "100"],
     },
     "reduce_scatter": {
         "binary": "reduce_scatter_perf",
-        "args": ["-b", "8", "-e", "1G", "-f", "2", "-g", "2"],
+        "args": ["-b", "8", "-e", "1G", "-f", "2"],
     },
     "all_gather": {
         "binary": "all_gather_perf",
-        "args": ["-b", "8", "-e", "1G", "-f", "2", "-g", "2"],
+        "args": ["-b", "8", "-e", "1G", "-f", "2"],
     },
     "broadcast": {
         "binary": "broadcast_perf",
-        "args": ["-b", "8", "-e", "1G", "-f", "2", "-g", "2"],
+        "args": ["-b", "8", "-e", "1G", "-f", "2"],
     },
     "sendrecv": {
         "binary": "sendrecv_perf",
-        "args": ["-b", "8", "-e", "1G", "-f", "2", "-g", "2"],
+        "args": ["-b", "8", "-e", "1G", "-f", "2"],
     },
 }
+
+
+def _build_nccl_command(test_name: str, gpu_count: int) -> list[str]:
+    """Build the argv for an NCCL test using the detected GPU count."""
+    config = NCCL_TEST_CONFIG.get(test_name)
+    if config is None:
+        raise KeyError(test_name)
+    binary = str(config["binary"])
+    args = [*config["args"], "-g", str(gpu_count)]
+    return [binary, *args]
 
 
 def _run_cmd(
@@ -85,6 +96,7 @@ def _run_cmd(
 def run_nccl_test(
     test_name: str,
     *,
+    gpu_count: int = 1,
     raw_output: str | None = None,
 ) -> dict[str, Any]:
     """Run a single NCCL test.
@@ -104,6 +116,7 @@ def run_nccl_test(
     if config is None:
         return {
             "test_key": test_name,
+            "gpu_count": gpu_count,
             "error": f"Unknown NCCL test: {test_name}",
             "devices": [],
             "results": [],
@@ -114,17 +127,22 @@ def run_nccl_test(
     if raw_output is not None:
         parsed = parse_nccl_output(raw_output)
         parsed["test_key"] = test_name
+        parsed["observed_gpu_count"] = parsed.get("gpu_count", 0)
+        parsed["gpu_count"] = gpu_count
+        parsed["argv"] = _build_nccl_command(test_name, gpu_count)
         return parsed
 
-    binary = config["binary"]
-    args = config["args"]
+    command = _build_nccl_command(test_name, gpu_count)
+    binary = str(config["binary"])
 
-    rc, stdout, stderr = _run_cmd([binary, *args])
+    rc, stdout, stderr = _run_cmd(command)
 
     if rc != 0:
         return {
             "test_key": test_name,
+            "gpu_count": gpu_count,
             "binary": binary,
+            "argv": command,
             "error": stderr or f"{binary} exited with code {rc}",
             "devices": [],
             "results": [],
@@ -134,11 +152,15 @@ def run_nccl_test(
 
     parsed = parse_nccl_output(stdout)
     parsed["test_key"] = test_name
+    parsed["observed_gpu_count"] = parsed.get("gpu_count", 0)
+    parsed["gpu_count"] = gpu_count
+    parsed["argv"] = command
     return parsed
 
 
 def collect_interconnect_matrix(
     *,
+    gpu_count: int | None = None,
     test_outputs: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Execute the full interconnect benchmark matrix.
@@ -152,7 +174,10 @@ def collect_interconnect_matrix(
     -------
     dict with results for all required NCCL tests.
     """
+    resolved_gpu_count = gpu_count if gpu_count is not None else detect_gpu_count()
+
     results: dict[str, Any] = {
+        "gpu_count": resolved_gpu_count,
         "tests_run": list(REQUIRED_NCCL_TESTS),
         "nccl_results": {},
         "bus_bandwidth_summary": {},
@@ -163,7 +188,7 @@ def collect_interconnect_matrix(
         if test_outputs and test_name in test_outputs:
             raw = test_outputs[test_name]
 
-        test_result = run_nccl_test(test_name, raw_output=raw)
+        test_result = run_nccl_test(test_name, gpu_count=resolved_gpu_count, raw_output=raw)
         results["nccl_results"][test_name] = test_result
 
         # Collect bus bandwidth summary
@@ -187,9 +212,11 @@ class InterconnectMatrixRunner(SectionRunner):
     def __init__(
         self,
         *,
+        gpu_count: int | None = None,
         test_outputs: dict[str, str] | None = None,
     ) -> None:
         super().__init__("interconnect")
+        self._gpu_count = gpu_count
         self._test_outputs = test_outputs
 
     def run(self) -> SectionResult:
@@ -198,6 +225,7 @@ class InterconnectMatrixRunner(SectionRunner):
 
         try:
             metrics = collect_interconnect_matrix(
+                gpu_count=self._gpu_count,
                 test_outputs=self._test_outputs,
             )
 

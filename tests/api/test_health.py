@@ -22,7 +22,7 @@ class TestHealthEndpoint:
         """Response body includes the application version."""
         data = client.get("/health").json()
         assert "version" in data
-        assert data["version"] == "0.1.0"
+        assert data["version"] == "0.2.0"
 
     def test_health_includes_service_name(self, client: TestClient) -> None:
         """Response body includes the service name."""

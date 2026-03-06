@@ -130,6 +130,7 @@ _NCCL_DATA_RE = re.compile(
 )
 
 _NCCL_AVG_BW_RE = re.compile(r"#\s*Avg\s+bus\s+bandwidth\s*:\s*([\d.]+)")
+_NCCL_GPU_COUNT_RE = re.compile(r"#\s*nThread\s+\d+\s+nGpus\s+(\d+)")
 
 
 def parse_nccl_output(raw: str) -> dict[str, Any]:
@@ -144,9 +145,10 @@ def parse_nccl_output(raw: str) -> dict[str, Any]:
 
     Returns
     -------
-    dict with keys: devices, results (list), avg_bus_bandwidth, max_busbw
+    dict with keys: gpu_count, devices, results (list), avg_bus_bandwidth, max_busbw
     """
     result: dict[str, Any] = {
+        "gpu_count": 0,
         "devices": [],
         "results": [],
         "avg_bus_bandwidth": 0.0,
@@ -156,6 +158,11 @@ def parse_nccl_output(raw: str) -> dict[str, Any]:
     max_busbw = 0.0
 
     for line in raw.splitlines():
+        gpu_count_match = _NCCL_GPU_COUNT_RE.search(line)
+        if gpu_count_match:
+            result["gpu_count"] = int(gpu_count_match.group(1))
+            continue
+
         # Parse device lines: "Rank  0 Group  0 Pid  12345 on hostname device  0 [0x04] NVIDIA H100"
         device_match = re.search(
             r"Rank\s+(\d+)\s+Group\s+(\d+)\s+Pid\s+(\d+)\s+on\s+(\S+)\s+device\s+(\d+)\s+"

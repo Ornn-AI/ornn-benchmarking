@@ -15,6 +15,7 @@ from typing import Any
 from ornn_bench.models import BenchmarkStatus, SectionResult
 from ornn_bench.runbook.parsers import parse_mamf_output
 from ornn_bench.runner import SectionRunner
+from ornn_bench.system import detect_gpu_count
 
 #: Required dtypes for compute matrix
 REQUIRED_DTYPES: tuple[str, ...] = ("bf16", "fp8_e4m3", "fp8_e5m2", "fp16")
@@ -169,7 +170,7 @@ def run_mamf_fixed_shape(
 
 
 def collect_compute_matrix(
-    gpu_count: int = 1,
+    gpu_count: int | None = None,
     *,
     include_tf32: bool = False,
     dtype_outputs: dict[str, str] | None = None,
@@ -192,18 +193,20 @@ def collect_compute_matrix(
     -------
     dict with per-GPU, per-dtype results and fixed-shape results.
     """
+    resolved_gpu_count = gpu_count if gpu_count is not None else detect_gpu_count()
+
     dtypes = list(REQUIRED_DTYPES)
     if include_tf32:
         dtypes.append("tf32")
 
     results: dict[str, Any] = {
-        "gpu_count": gpu_count,
+        "gpu_count": resolved_gpu_count,
         "dtypes_tested": dtypes,
         "per_gpu": {},
         "fixed_shape_results": {},
     }
 
-    for gpu_idx in range(gpu_count):
+    for gpu_idx in range(resolved_gpu_count):
         gpu_key = f"gpu_{gpu_idx}"
         results["per_gpu"][gpu_key] = {}
 
@@ -247,7 +250,7 @@ class ComputeMatrixRunner(SectionRunner):
 
     def __init__(
         self,
-        gpu_count: int = 1,
+        gpu_count: int | None = None,
         *,
         include_tf32: bool = False,
         dtype_outputs: dict[str, str] | None = None,

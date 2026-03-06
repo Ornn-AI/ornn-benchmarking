@@ -95,6 +95,65 @@ def sample_report() -> BenchmarkReport:
 
 
 @pytest.fixture()
+def normalized_sample_report() -> BenchmarkReport:
+    """Build a report whose components are normalized ratios for verify parity."""
+    return BenchmarkReport.model_validate(
+        {
+            "schema_version": "1.0.0",
+            "report_id": "integration-normalized-001",
+            "created_at": "2024-01-15T10:30:00Z",
+            "system_inventory": {
+                "gpus": [
+                    {
+                        "uuid": "GPU-12345678-abcd-1234-abcd-123456789abc",
+                        "name": "NVIDIA H100 80GB HBM3",
+                        "driver_version": "535.129.03",
+                        "cuda_version": "12.2",
+                        "memory_total_mb": 81920,
+                    }
+                ],
+                "os_info": "Ubuntu 22.04.3 LTS",
+                "kernel_version": "5.15.0-91-generic",
+                "cpu_model": "Intel(R) Xeon(R) Platinum 8480+",
+                "numa_nodes": 2,
+                "pytorch_version": "2.1.2",
+            },
+            "sections": [
+                {
+                    "name": "compute",
+                    "status": "completed",
+                    "started_at": "2024-01-15T10:30:05Z",
+                    "finished_at": "2024-01-15T10:35:00Z",
+                    "metrics": {},
+                }
+            ],
+            "scores": {
+                "ornn_i": 100.0,
+                "ornn_t": 100.0,
+                "qualification": "Premium",
+                "components": {"bw": 1.0, "fp8": 1.0, "bf16": 1.0, "ar": 1.0},
+                "score_status": "valid",
+                "aggregate_method": "minimum",
+                "per_gpu_scores": [
+                    {
+                        "gpu_uuid": "GPU-12345678-abcd-1234-abcd-123456789abc",
+                        "ornn_i": 100.0,
+                        "ornn_t": 100.0,
+                        "components": {
+                            "bw": 1.0,
+                            "fp8": 1.0,
+                            "bf16": 1.0,
+                            "ar": 1.0,
+                        },
+                    }
+                ],
+            },
+            "manifest": {},
+        }
+    )
+
+
+@pytest.fixture()
 def report_file(tmp_path: Path, sample_report: BenchmarkReport) -> Path:
     """Write a sample report to a temp file."""
     path = tmp_path / "report.json"
@@ -249,7 +308,7 @@ class TestVerifyIntegration:
     def test_matching_scores_return_verified(
         self,
         api_test_client: TestClient,
-        sample_report: BenchmarkReport,
+        normalized_sample_report: BenchmarkReport,
     ) -> None:
         """Matching scores return 'verified' status (VAL-CROSS-002).
 
@@ -262,10 +321,10 @@ class TestVerifyIntegration:
         response = api_test_client.post(
             "/api/v1/verify",
             json={
-                "components": {"bw": 1.0, "fp8": 1.0, "bf16": 1.0, "ar": 1.0},
-                "ornn_i": 100.0,
-                "ornn_t": 100.0,
-                "qualification": "Premium",
+                "components": normalized_sample_report.scores.components,
+                "ornn_i": normalized_sample_report.scores.ornn_i,
+                "ornn_t": normalized_sample_report.scores.ornn_t,
+                "qualification": normalized_sample_report.scores.qualification.value,
             },
             headers={"X-API-Key": TEST_API_KEY},
         )

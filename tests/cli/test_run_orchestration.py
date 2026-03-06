@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 
 from ornn_bench.cli import app
 from ornn_bench.models import BenchmarkStatus, SectionResult
+from ornn_bench.runbook.manifest import ManifestRunner
 from ornn_bench.runner import (
     SECTION_ORDER,
     RunOrchestrator,
@@ -62,9 +63,141 @@ class FailingSectionRunner(SectionRunner):
         )
 
 
+class MetricsSectionRunner(SectionRunner):
+    """A section runner that succeeds with predefined metrics."""
+
+    def __init__(self, name: str, metrics: dict[str, object]) -> None:
+        super().__init__(name)
+        self._metrics = metrics
+
+    def run(self) -> SectionResult:
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc).isoformat()
+        return SectionResult(
+            name=self.name,
+            status=BenchmarkStatus.COMPLETED,
+            started_at=now,
+            finished_at=now,
+            metrics=self._metrics,
+        )
+
+
 def _make_stub_runners() -> dict[str, SectionRunner]:
     """Create stub runners for all standard sections."""
     return {name: StubSectionRunner(name) for name in SECTION_ORDER}
+
+
+def _sample_preflight_metrics() -> dict[str, object]:
+    return {
+        "os": "Ubuntu 22.04.3 LTS",
+        "kernel": "5.15.0-91-generic",
+        "cpu_model": "Intel(R) Xeon(R) Platinum 8480+",
+        "numa_nodes": 2,
+        "pytorch_version": "2.1.2",
+        "driver_version": "535.129.03",
+        "cuda_version": "12.2",
+        "software_versions": {
+            "driver": "535.129.03",
+            "cuda": "12.2",
+            "python": "3.10.13",
+        },
+        "gpu_inventory": {
+            "gpus": [
+                {
+                    "uuid": "GPU-12345678-abcd-1234-abcd-123456789abc",
+                    "product_name": "NVIDIA H100 80GB HBM3",
+                    "memory_total_mib": 81920,
+                }
+            ]
+        },
+    }
+
+
+def _sample_scoring_preflight_metrics() -> dict[str, object]:
+    return {
+        **_sample_preflight_metrics(),
+        "gpu_inventory": {
+            "gpus": [
+                {
+                    "uuid": "GPU-AAA",
+                    "product_name": "NVIDIA H100 80GB HBM3",
+                    "memory_total_mib": 81920,
+                },
+                {
+                    "uuid": "GPU-BBB",
+                    "product_name": "NVIDIA H100 80GB HBM3",
+                    "memory_total_mib": 81920,
+                },
+            ]
+        },
+    }
+
+
+def _sample_scoring_compute_metrics() -> dict[str, object]:
+    return {
+        "gpu_count": 2,
+        "per_gpu": {
+            "gpu_0": {
+                "bf16": {"best": {"tflops": 891.3}},
+                "fp8_e4m3": {"best": {"tflops": 1782.6}},
+                "fp8_e5m2": {"best": {"tflops": 1750.4}},
+            },
+            "gpu_1": {
+                "bf16": {"best": {"tflops": 891.3}},
+                "fp8_e4m3": {"best": {"tflops": 1782.6}},
+                "fp8_e5m2": {"best": {"tflops": 1750.4}},
+            },
+        },
+        "fixed_shape_results": {},
+    }
+
+
+def _sample_scoring_memory_metrics() -> dict[str, object]:
+    return {
+        "nvbandwidth_results": {
+            "device_local_copy": {"max": 2039.5},
+            "device_local_copy_sm": {"max": 2041.0},
+        },
+        "pytorch_d2d_crossval": {"bandwidth_gb_s": 1985.3},
+    }
+
+
+def _sample_scoring_interconnect_metrics() -> dict[str, object]:
+    return {
+        "gpu_count": 2,
+        "nccl_results": {
+            "all_reduce_1gb": {"avg_bus_bandwidth": 148.32},
+        },
+        "bus_bandwidth_summary": {
+            "all_reduce_1gb": {"avg_busbw": 148.32, "max_busbw": 148.32},
+        },
+    }
+
+
+def _make_enriched_runners() -> dict[str, SectionRunner]:
+    runners = _make_stub_runners()
+    runners["pre-flight"] = MetricsSectionRunner("pre-flight", _sample_preflight_metrics())
+    runners["manifest"] = ManifestRunner()
+    return runners
+
+
+def _make_scored_runners() -> dict[str, SectionRunner]:
+    runners = _make_stub_runners()
+    runners["pre-flight"] = MetricsSectionRunner(
+        "pre-flight", _sample_scoring_preflight_metrics()
+    )
+    runners["compute"] = MetricsSectionRunner(
+        "compute", _sample_scoring_compute_metrics()
+    )
+    runners["memory"] = MetricsSectionRunner(
+        "memory", _sample_scoring_memory_metrics()
+    )
+    runners["interconnect"] = MetricsSectionRunner(
+        "interconnect", _sample_scoring_interconnect_metrics()
+    )
+    runners["manifest"] = ManifestRunner()
+    return runners
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +411,54 @@ class TestRunCommandCLI:
         data = json.loads(output_path.read_text())
         assert "sections" in data
         assert "schema_version" in data
+
+    def test_run_persists_enriched_system_inventory_and_manifest(
+        self, tmp_path: Path
+    ) -> None:
+        """run command writes enriched top-level inventory and manifest fields."""
+        output_path = tmp_path / "report.json"
+        with (
+            patch("ornn_bench.cli.check_gpu_available", return_value=(True, "Found 1 GPU")),
+            patch("ornn_bench.cli.build_section_runners", return_value=_make_enriched_runners()),
+        ):
+            result = runner.invoke(app, ["run", "--output", str(output_path)])
+
+        assert result.exit_code == 0, f"Output: {result.output}"
+        data = json.loads(output_path.read_text())
+        assert data["system_inventory"]["kernel_version"] == "5.15.0-91-generic"
+        assert data["system_inventory"]["gpus"][0]["uuid"] == (
+            "GPU-12345678-abcd-1234-abcd-123456789abc"
+        )
+        assert data["manifest"]["entries"]
+        assert data["manifest"]["summary"]["produced"] > 0
+
+    def test_run_persists_scored_report_with_normalized_components(
+        self, tmp_path: Path
+    ) -> None:
+        """run command writes normalized score components and per-GPU aggregates."""
+        output_path = tmp_path / "report.json"
+        with (
+            patch("ornn_bench.cli.check_gpu_available", return_value=(True, "Found 2 GPUs")),
+            patch("ornn_bench.cli.build_section_runners", return_value=_make_scored_runners()),
+        ):
+            result = runner.invoke(app, ["run", "--output", str(output_path)])
+
+        assert result.exit_code == 0, f"Output: {result.output}"
+        data = json.loads(output_path.read_text())
+        assert data["scores"]["ornn_i"] == 100.0
+        assert data["scores"]["ornn_t"] == 100.0
+        assert data["scores"]["qualification"] == "Premium"
+        assert data["scores"]["score_status"] == "valid"
+        assert data["scores"]["components"] == {
+            "bw": 1.0,
+            "fp8": 1.0,
+            "bf16": 1.0,
+            "ar": 1.0,
+        }
+        assert data["scores"]["aggregate_method"] == "minimum"
+        assert len(data["scores"]["per_gpu_scores"]) == 2
+        assert data["scores"]["per_gpu_scores"][0]["gpu_uuid"] == "GPU-AAA"
+        assert data["scores"]["per_gpu_scores"][1]["gpu_uuid"] == "GPU-BBB"
 
     def test_run_shows_progress_text(self) -> None:
         """run output contains progress/status text."""

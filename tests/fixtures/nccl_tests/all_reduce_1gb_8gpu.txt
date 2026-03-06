@@ -1,0 +1,18 @@
+# nThread 1 nGpus 8 minBytes 1073741824 maxBytes 1073741824 step: 1(bytes) warmup iters: 5 iters: 100 agg iters: 1 validation: 1 graph: 0
+#
+# Using devices
+#  Rank  0 Group  0 Pid  12345 on hostname device  0 [0x04] NVIDIA H100 80GB HBM3
+#  Rank  1 Group  0 Pid  12345 on hostname device  1 [0x05] NVIDIA H100 80GB HBM3
+#  Rank  2 Group  0 Pid  12345 on hostname device  2 [0x06] NVIDIA H100 80GB HBM3
+#  Rank  3 Group  0 Pid  12345 on hostname device  3 [0x07] NVIDIA H100 80GB HBM3
+#  Rank  4 Group  0 Pid  12345 on hostname device  4 [0x08] NVIDIA H100 80GB HBM3
+#  Rank  5 Group  0 Pid  12345 on hostname device  5 [0x09] NVIDIA H100 80GB HBM3
+#  Rank  6 Group  0 Pid  12345 on hostname device  6 [0x0a] NVIDIA H100 80GB HBM3
+#  Rank  7 Group  0 Pid  12345 on hostname device  7 [0x0b] NVIDIA H100 80GB HBM3
+#
+#                                                              out-of-place                       in-place
+#       size         count      type   redop    root     time   algbw   busbw #wrong     time   algbw   busbw #wrong
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)
+  1073741824     268435456     float     sum      -1  7241.11  148.32  148.32      0  7241.07  148.32  148.32      0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 148.32

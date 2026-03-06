@@ -1,0 +1,132 @@
+{
+  "groupId": "report-surface",
+  "testedAt": "2026-03-06T03:59:39.268443Z",
+  "credentials": {
+    "account": "local-shell-report",
+    "namespace": "benchcore-report"
+  },
+  "toolsUsed": ["Execute", "Read", "Grep"],
+  "assertions": [
+    {
+      "id": "VAL-CORE-004",
+      "title": "Pre-flight inventory is mapped into BenchmarkReport.system_inventory",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `./.venv/bin/ornn-bench report tests/fixtures/sample_report.json --json`.",
+          "expected": "CLI should re-render a saved report cleanly on this non-GPU host and expose populated `system_inventory` fields.",
+          "observed": "Command exited 0 and printed `system_inventory` with GPU UUID/name/driver/CUDA/memory plus `kernel_version`, `cpu_model`, `numa_nodes`, and `pytorch_version`."
+        },
+        {
+          "action": "Generate `/tmp/benchcore-report-enriched.json` with `DurableRunOrchestrator(runners=_make_enriched_runners())`.",
+          "expected": "A persisted fixture-driven report should contain top-level `system_inventory` derived from the pre-flight section metrics.",
+          "observed": "Temporary report was written under the assigned namespace and its top-level `system_inventory.gpus` contained 2 GPUs alongside the expected kernel/CPU/NUMA/PyTorch fields."
+        },
+        {
+          "action": "Run `./.venv/bin/python -m pytest -q --basetemp=/tmp/benchcore-report-pytest tests/runbook/test_manifest_and_durability.py tests/cli/test_report_command.py tests/cli/test_info_command.py`.",
+          "expected": "Targeted CLI/report enrichment tests should pass.",
+          "observed": "54/54 tests passed, including `test_orchestrator_maps_preflight_metrics_to_system_inventory` and `test_persisted_report_includes_system_inventory_and_manifest`."
+        }
+      ],
+      "evidence": {
+        "terminalOutput": [
+          "`ornn-bench report tests/fixtures/sample_report.json --json` printed `system_inventory.gpus[0].uuid = GPU-12345678-abcd-1234-abcd-123456789abc`, `driver_version = 535.129.03`, `cuda_version = 12.2`, and `memory_total_mb = 81920`.",
+          "`ornn-bench report /tmp/benchcore-report-enriched.json --json` showed `kernel_version = 5.15.0-91-generic`, `cpu_model = Intel(R) Xeon(R) Platinum 8480+`, `numa_nodes = 2`, `pytorch_version = 2.1.2`, and 2 populated GPU records."
+        ],
+        "pytest": [
+          "54/54 targeted tests passed.",
+          "Relevant tests: `tests/runbook/test_manifest_and_durability.py::TestBenchmarkReportEnrichment::test_orchestrator_maps_preflight_metrics_to_system_inventory` and `tests/runbook/test_manifest_and_durability.py::TestDurableRunOrchestrator::test_persisted_report_includes_system_inventory_and_manifest`."
+        ],
+        "artifacts": ["/tmp/benchcore-report-enriched.json"],
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CORE-005",
+      "title": "Manifest section is mapped into BenchmarkReport.manifest",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Generate `/tmp/benchcore-report-enriched.json` with `DurableRunOrchestrator(runners=_make_enriched_runners())`.",
+          "expected": "A persisted fixture-driven report should carry the manifest section output into the top-level `manifest` field.",
+          "observed": "Temporary report was written with a populated top-level `manifest` object containing `entries` and `summary`."
+        },
+        {
+          "action": "Run `./.venv/bin/ornn-bench report /tmp/benchcore-report-enriched.json --json`.",
+          "expected": "CLI JSON output should expose the populated top-level `manifest`.",
+          "observed": "Command exited 0 and printed `manifest.entries` with produced artifacts plus `manifest.summary` showing `total = 21`, `produced = 21`, `skipped = 0`, `missing = 0`."
+        },
+        {
+          "action": "Run `./.venv/bin/python -m pytest -q --basetemp=/tmp/benchcore-report-pytest tests/runbook/test_manifest_and_durability.py tests/cli/test_report_command.py tests/cli/test_info_command.py`.",
+          "expected": "Targeted enrichment tests should prove manifest mapping from section output.",
+          "observed": "54/54 tests passed, including `test_orchestrator_maps_manifest_metrics_to_report_manifest` and `test_persisted_report_includes_system_inventory_and_manifest`."
+        }
+      ],
+      "evidence": {
+        "terminalOutput": [
+          "`ornn-bench report /tmp/benchcore-report-enriched.json --json` printed a top-level `manifest.entries` list containing 21 produced artifacts.",
+          "The same JSON output showed `manifest.summary.total = 21`, `produced = 21`, `skipped = 0`, and `missing = 0`."
+        ],
+        "pytest": [
+          "54/54 targeted tests passed.",
+          "Relevant tests: `tests/runbook/test_manifest_and_durability.py::TestBenchmarkReportEnrichment::test_orchestrator_maps_manifest_metrics_to_report_manifest` and `tests/runbook/test_manifest_and_durability.py::TestDurableRunOrchestrator::test_persisted_report_includes_system_inventory_and_manifest`."
+        ],
+        "artifacts": ["/tmp/benchcore-report-enriched.json"],
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CORE-012",
+      "title": "CLI non-GPU behavior remains clean",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Run `./.venv/bin/ornn-bench info` on the macOS non-GPU host.",
+          "expected": "Command should succeed and provide actionable remediation instead of a Python traceback.",
+          "observed": "Command exited 0, showed Darwin/Apple M4 system info, reported `nvidia-smi` missing, and printed install/build guidance for NVIDIA drivers, nvbandwidth, and nccl-tests with no traceback."
+        },
+        {
+          "action": "Run `./.venv/bin/ornn-bench report tests/fixtures/sample_report.json --json` and `./.venv/bin/ornn-bench report tests/fixtures/sample_report.json`.",
+          "expected": "Both report modes should render cleanly without GPU tooling and without raw Python tracebacks.",
+          "observed": "Both commands exited 0. JSON mode printed the report payload, and plain mode rendered report metadata, section statuses, scores, and qualification with no traceback."
+        },
+        {
+          "action": "Run `./.venv/bin/python -m pytest -q --basetemp=/tmp/benchcore-report-pytest tests/runbook/test_manifest_and_durability.py tests/cli/test_report_command.py tests/cli/test_info_command.py`.",
+          "expected": "CLI regression tests for `info` and `report` should pass on the non-GPU host.",
+          "observed": "54/54 tests passed, covering clean exit behavior and no-traceback assertions for both commands."
+        }
+      ],
+      "evidence": {
+        "terminalOutput": [
+          "`ornn-bench info` exited 0 and printed `nvidia-smi not found on PATH` plus actionable remediation instead of a traceback.",
+          "`ornn-bench report tests/fixtures/sample_report.json --json` exited 0 and printed valid JSON.",
+          "`ornn-bench report tests/fixtures/sample_report.json` exited 0 and rendered report metadata, section statuses, scores, component metrics, and qualification without any `Traceback`."
+        ],
+        "pytest": [
+          "54/54 targeted tests passed.",
+          "Relevant tests: `tests/cli/test_info_command.py::TestInfoCommand::test_info_exits_cleanly`, `tests/cli/test_info_command.py::TestInfoCommand::test_info_no_raw_traceback`, `tests/cli/test_report_command.py::TestReportCommandNoGPURequired::test_no_nvidia_smi_required`, and `tests/cli/test_report_command.py::TestReportCommandNoGPURequired::test_no_traceback_in_output`."
+        ],
+        "network": "not applicable"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [
+    {
+      "description": "This macOS host has no NVIDIA tooling, so `ornn-bench run` cannot be exercised live for report enrichment.",
+      "resolved": true,
+      "resolution": "Used the required fixture-driven path: targeted pytest plus a temporary report generated under `/tmp/benchcore-report-enriched.json` from `_make_enriched_runners()`.",
+      "affectedAssertions": ["VAL-CORE-004", "VAL-CORE-005"]
+    },
+    {
+      "description": "`tests/fixtures/sample_report.json` and `tests/fixtures/sample_scored_report.json` keep `manifest` empty, so the direct CLI fixture path alone cannot validate manifest mapping.",
+      "resolved": true,
+      "resolution": "Validated VAL-CORE-005 with the temporary enriched report and the manifest mapping tests in `tests/runbook/test_manifest_and_durability.py`.",
+      "affectedAssertions": ["VAL-CORE-005"]
+    }
+  ],
+  "blockers": [],
+  "summary": "Tested 3 assertions: 3 passed, 0 failed, 0 blocked. Live CLI checks (`info`, `report` JSON, and `report` plain) stayed clean on the non-GPU macOS host, and 54 targeted pytest cases passed using `--basetemp=/tmp/benchcore-report-pytest`."
+}

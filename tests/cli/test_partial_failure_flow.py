@@ -79,6 +79,24 @@ class ExceptionSectionRunner(SectionRunner):
         raise RuntimeError(f"Unexpected error in {self.name}")
 
 
+class MetricsSectionRunner(SectionRunner):
+    """A section runner that succeeds with predefined metrics."""
+
+    def __init__(self, name: str, metrics: dict[str, object]) -> None:
+        super().__init__(name)
+        self._metrics = metrics
+
+    def run(self) -> SectionResult:
+        now = datetime.now(timezone.utc).isoformat()
+        return SectionResult(
+            name=self.name,
+            status=BenchmarkStatus.COMPLETED,
+            started_at=now,
+            finished_at=now,
+            metrics=self._metrics,
+        )
+
+
 def _make_runners_with_failure(fail_section: str, fail_type: str = "failed") -> (
     dict[str, SectionRunner]
 ):
@@ -99,6 +117,52 @@ def _make_runners_with_failure(fail_section: str, fail_type: str = "failed") -> 
 
 def _make_all_stub_runners() -> dict[str, SectionRunner]:
     return {name: StubSectionRunner(name) for name in SECTION_ORDER}
+
+
+def _make_scoring_runners_with_memory_failure() -> dict[str, SectionRunner]:
+    runners: dict[str, SectionRunner] = {
+        name: StubSectionRunner(name) for name in SECTION_ORDER
+    }
+    runners["pre-flight"] = MetricsSectionRunner(
+        "pre-flight",
+        {
+            "gpu_inventory": {
+                "gpus": [
+                    {
+                        "uuid": "GPU-AAA",
+                        "product_name": "NVIDIA H100 80GB HBM3",
+                        "memory_total_mib": 81920,
+                    }
+                ]
+            }
+        },
+    )
+    runners["compute"] = MetricsSectionRunner(
+        "compute",
+        {
+            "gpu_count": 1,
+            "per_gpu": {
+                "gpu_0": {
+                    "bf16": {"best": {"tflops": 891.3}},
+                    "fp8_e4m3": {"best": {"tflops": 1782.6}},
+                    "fp8_e5m2": {"best": {"tflops": 1750.4}},
+                }
+            },
+        },
+    )
+    runners["memory"] = FailingSectionRunner("memory")
+    runners["interconnect"] = MetricsSectionRunner(
+        "interconnect",
+        {
+            "bus_bandwidth_summary": {
+                "all_reduce_1gb": {"avg_busbw": 148.32, "max_busbw": 148.32}
+            },
+            "nccl_results": {
+                "all_reduce_1gb": {"avg_bus_bandwidth": 148.32}
+            },
+        },
+    )
+    return runners
 
 
 # ---------------------------------------------------------------------------
@@ -263,6 +327,30 @@ class TestFailureReporting:
 
 class TestPartialFailureCLI:
     """CLI integration tests for partial failure behavior."""
+
+    def test_partial_failure_report_includes_partial_scores(self, tmp_path: Path) -> None:
+        """Failed sections still persist partial scores with actionable detail."""
+        from ornn_bench.cli import app
+
+        output_path = tmp_path / "report.json"
+        with (
+            patch("ornn_bench.cli.check_gpu_available", return_value=(True, "Found 1 GPU")),
+            patch(
+                "ornn_bench.cli.build_section_runners",
+                return_value=_make_scoring_runners_with_memory_failure(),
+            ),
+        ):
+            result = runner.invoke(app, ["run", "--output", str(output_path)])
+
+        assert result.exit_code != 0
+        data = json.loads(output_path.read_text())
+        assert data["scores"]["score_status"] == "partial"
+        assert data["scores"]["ornn_i"] is None
+        assert data["scores"]["ornn_t"] == 100.0
+        assert data["scores"]["aggregate_method"] == "minimum"
+        assert data["scores"]["score_status_detail"] is not None
+        assert "memory" in data["scores"]["score_status_detail"].lower()
+        assert "bw" in data["scores"]["score_status_detail"].lower()
 
     def test_partial_failure_exit_code(self) -> None:
         """CLI returns non-zero exit code when a section fails."""

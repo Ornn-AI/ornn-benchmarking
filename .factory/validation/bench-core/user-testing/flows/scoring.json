@@ -1,0 +1,253 @@
+{
+  "groupId": "scoring",
+  "testedAt": "2026-03-06T03:58:01Z",
+  "credentials": {
+    "account": "local-shell-scoring",
+    "namespace": "benchcore-scoring"
+  },
+  "toolsUsed": ["Execute", "Read", "Grep"],
+  "assertions": [
+    {
+      "id": "VAL-CORE-006",
+      "title": "Local scores are computed and persisted in the report",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect src/ornn_bench/scoring.py and the scoring-focused tests",
+          "expected": "The run flow should compute Ornn-I/Ornn-T, qualification, score_status, and helpful score_status_detail when metrics are partial or missing",
+          "observed": "derive_scores_from_sections() builds ScoreResult via aggregate_gpu_scores(); _build_score_detail() augments partial/error cases with source-specific detail"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics",
+          "expected": "A completed scored run produces numeric ornn_i/ornn_t, valid score_status, qualification, and serialized score components",
+          "observed": "PASSED — report.scores had ornn_i=100.0, ornn_t=100.0, score_status=VALID, qualification=Premium, aggregate_method=minimum, and two per_gpu_scores records"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_failed_memory_section_produces_partial_score_with_helpful_detail plus tests/cli/test_partial_failure_flow.py::TestPartialFailureCLI::test_partial_failure_report_includes_partial_scores",
+          "expected": "When a required section fails, the saved report should persist a partial/error score with actionable detail",
+          "observed": "PASSED — missing memory produced score_status partial, ornn_i null, ornn_t 100.0, aggregate_method minimum, and detail text mentioning memory and bw"
+        },
+        {
+          "action": "Run pytest target tests/cli/test_run_orchestration.py::TestRunCommandCLI::test_run_persists_scored_report_with_normalized_components",
+          "expected": "The CLI run command writes the computed scores into the output JSON report",
+          "observed": "PASSED — the generated JSON contained ornn_i 100.0, ornn_t 100.0, qualification Premium, score_status valid, aggregate_method minimum, and both GPU UUIDs under per_gpu_scores"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring tests/api/test_server_scoring.py tests/cli/test_partial_failure_flow.py tests/cli/test_run_orchestration.py::TestRunCommandCLI::test_run_persists_scored_report_with_normalized_components -> 149 passed in 0.11s",
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -vv -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_failed_memory_section_produces_partial_score_with_helpful_detail tests/cli/test_run_orchestration.py::TestRunCommandCLI::test_run_persists_scored_report_with_normalized_components -> 3 passed"
+        ],
+        "consoleErrors": "none",
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CORE-007",
+      "title": "Score components are normalized ratios suitable for server verification",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect src/ornn_bench/scoring.py",
+          "expected": "Persisted components should be normalized against documented H100 references so server verification can use refs=1.0",
+          "observed": "SECTION_METRIC_REFS defines bw/fp8/bf16/ar anchors and derive_scores_from_sections() documents that persisted components are ratio-based for server recomputation"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics",
+          "expected": "Reference-level fixture metrics should normalize to component ratios of 1.0",
+          "observed": "PASSED — report.scores.components equaled bw=1.0, fp8=1.0, bf16=1.0, ar=1.0"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_server_verification_matches_when_gpu_minima_differ_by_score_type",
+          "expected": "Non-reference fixture metrics should be persisted as ratios and server recomputation should match within tolerance",
+          "observed": "PASSED — fp8 persisted as 1600.0/1782.6, bf16 as 800.0/891.3, and recompute_and_verify() returned VERIFIED"
+        },
+        {
+          "action": "Inspect src/ornn_bench/api_client.py verify payload",
+          "expected": "The client should submit normalized components and local scores to the verification endpoint",
+          "observed": "OrnnApiClient.verify() posts components, ornn_i, ornn_t, and qualification to /api/v1/verify"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -vv -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_server_verification_matches_when_gpu_minima_differ_by_score_type -> 2 passed",
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring tests/api/test_server_scoring.py tests/cli/test_partial_failure_flow.py tests/cli/test_run_orchestration.py::TestRunCommandCLI::test_run_persists_scored_report_with_normalized_components -> 149 passed in 0.11s"
+        ],
+        "consoleErrors": "none",
+        "network": "No live HTTP was required on this macOS host; verification was exercised through api.scoring.recompute_and_verify() and by inspecting the /api/v1/verify payload in src/ornn_bench/api_client.py"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CORE-008",
+      "title": "Multi-GPU aggregation uses minimum-GPU semantics and is transparent",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect src/ornn_bench/scoring.py aggregate_gpu_scores()",
+          "expected": "Aggregate Ornn-I/Ornn-T should use minimum-GPU semantics and preserve per-GPU transparency",
+          "observed": "aggregate_gpu_scores() computes per-GPU records, aggregates with min() across valid GPU scores, and returns aggregate_method='minimum' with per_gpu_scores populated"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_formula_and_aggregation.py::TestPerGPUScoring::test_multi_gpu_uses_minimum",
+          "expected": "A weaker GPU should gate the aggregate scores",
+          "observed": "PASSED — with GPU ratios 1.0 and 0.5, aggregate Ornn-I and Ornn-T were both 50.0"
+        },
+        {
+          "action": "Run pytest targets tests/scoring/test_formula_and_aggregation.py::TestPerGPUScoring::test_per_gpu_records_preserved and ::test_aggregate_method_explicitly_recorded",
+          "expected": "Per-GPU records and explicit aggregate_method should be retained",
+          "observed": "PASSED — per_gpu_scores preserved GPU-AAA and GPU-BBB, and aggregate_method was recorded as minimum"
+        },
+        {
+          "action": "Run pytest target tests/cli/test_run_orchestration.py::TestRunCommandCLI::test_run_persists_scored_report_with_normalized_components",
+          "expected": "The saved JSON report should expose aggregate_method and per_gpu_scores for transparency",
+          "observed": "PASSED — output JSON stored aggregate_method minimum and two per_gpu_scores entries with GPU UUIDs"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -vv -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring/test_formula_and_aggregation.py::TestPerGPUScoring::test_multi_gpu_uses_minimum tests/scoring/test_formula_and_aggregation.py::TestPerGPUScoring::test_per_gpu_records_preserved tests/scoring/test_formula_and_aggregation.py::TestPerGPUScoring::test_aggregate_method_explicitly_recorded tests/cli/test_run_orchestration.py::TestRunCommandCLI::test_run_persists_scored_report_with_normalized_components -> 4 passed",
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring tests/api/test_server_scoring.py tests/cli/test_partial_failure_flow.py tests/cli/test_run_orchestration.py::TestRunCommandCLI::test_run_persists_scored_report_with_normalized_components -> 149 passed in 0.11s"
+        ],
+        "consoleErrors": "none",
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CORE-009",
+      "title": "Interconnect AR component derives from a documented NCCL metric",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect src/ornn_bench/scoring.py",
+          "expected": "The AR component should use a single documented NCCL source metric",
+          "observed": "AR_COMPONENT_SOURCE is interconnect.bus_bandwidth_summary.all_reduce_1gb.avg_busbw, with fallback to nccl_results.all_reduce_1gb.avg_bus_bandwidth if the summary field is absent"
+        },
+        {
+          "action": "Inspect the _interconnect_metrics fixture in tests/scoring/test_report_scoring_from_sections.py",
+          "expected": "The fixture should distinguish the intended all_reduce_1gb metric from other NCCL metrics",
+          "observed": "The fixture sets all_reduce_1gb to 148.32 and also includes an unrelated all_reduce_sweep value of 999.0"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics",
+          "expected": "AR normalization should come from the documented all_reduce_1gb field, not the sweep metric",
+          "observed": "PASSED — components.ar was exactly 1.0, which matches 148.32/148.32 and would not be possible if the 999.0 sweep metric had been used"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -vv -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics -> 1 passed"
+        ],
+        "consoleErrors": "none",
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CORE-010",
+      "title": "Compute BF16/FP8 components derive from per-GPU MAMF best results",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect src/ornn_bench/scoring.py",
+          "expected": "BF16 and FP8 components should come from per-GPU MAMF best.tflops values",
+          "observed": "BF16_COMPONENT_SOURCE points to compute.per_gpu.<gpu>.bf16.best.tflops, FP8_COMPONENT_SOURCES point to fp8_e4m3/fp8_e5m2 best.tflops, and _best_tflops() extracts the best.tflops field"
+        },
+        {
+          "action": "Inspect the _compute_metrics fixture in tests/scoring/test_report_scoring_from_sections.py",
+          "expected": "The fixture should supply per-GPU BF16 and FP8 MAMF best values",
+          "observed": "Each GPU fixture entry contains bf16.best.tflops plus fp8_e4m3.best.tflops and fp8_e5m2.best.tflops"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics",
+          "expected": "Reference-level MAMF best.tflops values should normalize BF16 and FP8 to 1.0",
+          "observed": "PASSED — report.scores.components contained bf16=1.0 and fp8=1.0"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_server_verification_matches_when_gpu_minima_differ_by_score_type",
+          "expected": "Changing per-GPU best.tflops values should change the persisted BF16/FP8 ratios deterministically",
+          "observed": "PASSED — fp8 persisted as 1600.0/1782.6 and bf16 as 800.0/891.3, then verified successfully server-side"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -vv -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_server_verification_matches_when_gpu_minima_differ_by_score_type -> 2 passed"
+        ],
+        "consoleErrors": "none",
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CORE-011",
+      "title": "Memory BW component derives from nvbandwidth results deterministically",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect src/ornn_bench/scoring.py",
+          "expected": "The BW component should come from a single documented nvbandwidth field",
+          "observed": "BW_COMPONENT_SOURCE is memory.nvbandwidth_results.device_local_copy.max and _extract_memory_bw_ratio() reads that field directly"
+        },
+        {
+          "action": "Inspect the _memory_metrics fixture in tests/scoring/test_report_scoring_from_sections.py",
+          "expected": "The fixture should include the documented field and distracting alternatives so the source field can be proven",
+          "observed": "The fixture sets device_local_copy.max=2039.5, while device_local_copy_sm.max=9999.0 and d2d_bidir.max=4079.0 are also present"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics",
+          "expected": "BW normalization should use device_local_copy.max and therefore equal 1.0 at the reference fixture value",
+          "observed": "PASSED — components.bw was 1.0, confirming the documented source field was used instead of the larger alternative metrics"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_failed_memory_section_produces_partial_score_with_helpful_detail",
+          "expected": "If the memory section is unavailable, the scoring detail should explicitly call out BW/memory as missing",
+          "observed": "PASSED — the partial score detail mentioned both memory and bw"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -vv -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_failed_memory_section_produces_partial_score_with_helpful_detail -> 2 passed"
+        ],
+        "consoleErrors": "none",
+        "network": "not applicable"
+      },
+      "issues": null
+    },
+    {
+      "id": "VAL-CROSS-005",
+      "title": "Server verification can recompute and match local scores",
+      "status": "pass",
+      "steps": [
+        {
+          "action": "Inspect api/scoring.py and src/ornn_bench/api_client.py",
+          "expected": "Server verification should recompute scores from submitted normalized components using the same formulas and tolerance semantics as the CLI",
+          "observed": "api.scoring.recompute_and_verify() uses refs=1.0 and DEFAULT_TOLERANCE=0.01, while OrnnApiClient.verify() posts components, local scores, and qualification to /api/v1/verify"
+        },
+        {
+          "action": "Run pytest target tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_server_verification_matches_when_gpu_minima_differ_by_score_type",
+          "expected": "A locally scored report built from normalized components should verify successfully",
+          "observed": "PASSED — recompute_and_verify() returned VERIFIED for the locally derived report components and scores"
+        },
+        {
+          "action": "Run pytest targets tests/api/test_server_scoring.py::TestRecomputeAndVerify::test_perfect_match_verified and ::test_tolerance_applied",
+          "expected": "Exact matches and small deltas within tolerance should verify",
+          "observed": "PASSED — exact scores verified, and 100.005/99.995 also verified within the default 0.01 tolerance"
+        }
+      ],
+      "evidence": {
+        "terminalSnapshots": [
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -vv -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_server_verification_matches_when_gpu_minima_differ_by_score_type tests/api/test_server_scoring.py::TestRecomputeAndVerify::test_perfect_match_verified tests/api/test_server_scoring.py::TestRecomputeAndVerify::test_tolerance_applied -> 3 passed",
+          "/Users/kushbavaria/Documents/ornn-benchmarking/.venv/bin/python -m pytest -p no:cacheprovider --basetemp=/tmp/benchcore-scoring-pytest tests/scoring tests/api/test_server_scoring.py tests/cli/test_partial_failure_flow.py tests/cli/test_run_orchestration.py::TestRunCommandCLI::test_run_persists_scored_report_with_normalized_components -> 149 passed in 0.11s"
+        ],
+        "consoleErrors": "none",
+        "network": "No live service call was needed per the non-GPU macOS guidance; the verify flow was validated through the server-side recomputation tests and by inspecting the POST /api/v1/verify client payload"
+      },
+      "issues": null
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 7 assertions: 7 passed, 0 failed, 0 blocked. Targeted scoring validation passed across 149 broad pytest checks and 9 focused scoring/verification cases. Local scoring persisted normalized components, partial-score detail, and minimum-based per-GPU aggregates, and the server recomputation path matched local scores within tolerance."
+}

@@ -1,0 +1,43 @@
+{
+  "milestone": "bench-infra",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 15,
+    "passed": 15,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CROSS-001",
+    "VAL-CROSS-002",
+    "VAL-CROSS-004",
+    "VAL-INFRA-001",
+    "VAL-INFRA-002",
+    "VAL-INFRA-003",
+    "VAL-INFRA-004",
+    "VAL-INFRA-005",
+    "VAL-INFRA-006",
+    "VAL-INFRA-007",
+    "VAL-INFRA-008",
+    "VAL-INFRA-009",
+    "VAL-INFRA-010",
+    "VAL-INFRA-011",
+    "VAL-INFRA-012"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Added Bench Infra Shell flow-validator guidance for macOS validation, including bash syntax checks, targeted pytest usage, isolation rules, and explicit non-testable live Linux/NVIDIA paths.",
+      "source": "setup"
+    },
+    {
+      "target": "user-testing.md",
+      "description": "Documented that macOS pytest artifacts created under /tmp may resolve under /private/tmp when inspecting stub benchmark-node campaign outputs.",
+      "source": "flow-report"
+    }
+  ],
+  "previousRound": null
+}

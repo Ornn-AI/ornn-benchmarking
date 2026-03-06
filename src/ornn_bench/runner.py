@@ -19,7 +19,9 @@ from pathlib import Path
 from ornn_bench.models import (
     BenchmarkReport,
     BenchmarkStatus,
+    GPUInfo,
     SectionResult,
+    SystemInventory,
 )
 
 # ---------------------------------------------------------------------------
@@ -54,6 +56,129 @@ BENCHMARK_SECTIONS: frozenset[str] = frozenset({
 
 # Type alias for progress callbacks
 ProgressCallback = Callable[[str, str], None]
+
+
+def _as_dict(value: object) -> dict[str, object]:
+    """Return a shallow string-keyed dict when possible."""
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): val for key, val in value.items()}
+
+
+def _as_list_of_dicts(value: object) -> list[dict[str, object]]:
+    """Return a list containing only dict items."""
+    if not isinstance(value, list):
+        return []
+
+    items: list[dict[str, object]] = []
+    for item in value:
+        if isinstance(item, dict):
+            items.append({str(key): val for key, val in item.items()})
+    return items
+
+
+def _as_str(value: object) -> str:
+    """Coerce a value to string when it is already textual."""
+    return value if isinstance(value, str) else ""
+
+
+def _as_int(value: object) -> int:
+    """Coerce an integer-like value to int."""
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            try:
+                return int(float(value))
+            except ValueError:
+                return 0
+    return 0
+
+
+def _find_section(sections: list[SectionResult], name: str) -> SectionResult | None:
+    """Return the section result with the matching name, if present."""
+    for section in sections:
+        if section.name == name:
+            return section
+    return None
+
+
+def _derive_system_inventory(sections: list[SectionResult]) -> SystemInventory:
+    """Build top-level system inventory from pre-flight metrics."""
+    preflight = _find_section(sections, "pre-flight")
+    if preflight is None or preflight.status != BenchmarkStatus.COMPLETED:
+        return SystemInventory()
+
+    metrics = _as_dict(preflight.metrics)
+    software_versions = _as_dict(metrics.get("software_versions"))
+    gpu_inventory = _as_dict(metrics.get("gpu_inventory"))
+    gpu_entries = _as_list_of_dicts(gpu_inventory.get("gpus"))
+    if not gpu_entries:
+        gpu_entries = _as_list_of_dicts(metrics.get("gpus"))
+
+    driver_version = _as_str(
+        metrics.get("driver_version") or software_versions.get("driver")
+    )
+    cuda_version = _as_str(
+        metrics.get("cuda_version") or software_versions.get("cuda")
+    )
+
+    gpus: list[GPUInfo] = []
+    for gpu in gpu_entries:
+        gpus.append(
+            GPUInfo(
+                uuid=_as_str(gpu.get("uuid")),
+                name=_as_str(gpu.get("name") or gpu.get("product_name")),
+                driver_version=_as_str(gpu.get("driver_version") or driver_version),
+                cuda_version=_as_str(gpu.get("cuda_version") or cuda_version),
+                memory_total_mb=_as_int(
+                    gpu.get("memory_total_mb") or gpu.get("memory_total_mib")
+                ),
+            )
+        )
+
+    return SystemInventory(
+        gpus=gpus,
+        os_info=_as_str(metrics.get("os_info") or metrics.get("os")),
+        kernel_version=_as_str(metrics.get("kernel_version") or metrics.get("kernel")),
+        cpu_model=_as_str(metrics.get("cpu_model")),
+        numa_nodes=_as_int(metrics.get("numa_nodes")),
+        pytorch_version=_as_str(metrics.get("pytorch_version")),
+    )
+
+
+def _derive_manifest(sections: list[SectionResult]) -> dict[str, object]:
+    """Build top-level manifest from the manifest section metrics."""
+    manifest = _find_section(sections, "manifest")
+    if manifest is None or manifest.status != BenchmarkStatus.COMPLETED:
+        return {}
+    return _as_dict(manifest.metrics)
+
+
+def _build_benchmark_report(
+    *,
+    report_id: str,
+    created_at: str,
+    sections: list[SectionResult],
+) -> BenchmarkReport:
+    """Construct the benchmark report with derived top-level sections."""
+    from ornn_bench.scoring import derive_scores_from_sections
+
+    return BenchmarkReport(
+        schema_version="1.0.0",
+        report_id=report_id,
+        created_at=created_at,
+        system_inventory=_derive_system_inventory(sections),
+        sections=sections,
+        scores=derive_scores_from_sections(sections),
+        manifest=_derive_manifest(sections),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -230,8 +355,7 @@ class RunOrchestrator:
     def _build_report(self) -> BenchmarkReport:
         """Build a BenchmarkReport from collected section results."""
         now = datetime.now(timezone.utc).isoformat()
-        return BenchmarkReport(
-            schema_version="1.0.0",
+        return _build_benchmark_report(
             report_id=str(uuid.uuid4()),
             created_at=now,
             sections=self._results,
@@ -276,8 +400,7 @@ class DurableRunOrchestrator(RunOrchestrator):
 
     def _persist_current_state(self) -> None:
         """Write current report state to disk."""
-        report = BenchmarkReport(
-            schema_version="1.0.0",
+        report = _build_benchmark_report(
             report_id=self._report_id,
             created_at=self._created_at,
             sections=list(self._results),
@@ -378,8 +501,7 @@ class DurableRunOrchestrator(RunOrchestrator):
 
     def _build_report(self) -> BenchmarkReport:
         """Build a BenchmarkReport using the pre-assigned report ID."""
-        return BenchmarkReport(
-            schema_version="1.0.0",
+        return _build_benchmark_report(
             report_id=self._report_id,
             created_at=self._created_at,
             sections=self._results,
