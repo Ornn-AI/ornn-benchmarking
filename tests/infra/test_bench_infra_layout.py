@@ -174,3 +174,74 @@ class TestProvisionScript:
 
         for key in exported_keys:
             assert f"printf '{key}=\"%s\"\\n'" in content
+
+
+class TestBenchmarkNodeScript:
+    def test_verifies_toolchain_lock_and_ornn_bench_version(self) -> None:
+        content = _read(BENCHMARK_NODE_SCRIPT)
+
+        required_snippets = (
+            'source "${TOOLCHAIN_ENV}"',
+            'source "${RUNTIME_ENV}"',
+            '[[ "${ACTUAL_ORNN_BENCH_VERSION}" == "${ORNN_BENCH_VERSION}" ]]',
+            'verify_git_pin "${MAMF_FINDER_REPO_DIR}" "${MAMF_FINDER_COMMIT}" "mamf-finder repo"',
+            'verify_git_pin "${NCCL_TESTS_REPO_DIR}" "${NCCL_TESTS_COMMIT}" "nccl-tests repo"',
+            '[[ "${ACTUAL_LIBNCCL2_VERSION}" == "${NCCL_DEV_VERSION}" ]]',
+            '[[ "${ACTUAL_LIBNCCL_DEV_VERSION}" == "${NCCL_DEV_VERSION}" ]]',
+        )
+
+        for snippet in required_snippets:
+            assert snippet in content, f"Expected toolchain verification snippet: {snippet}"
+
+    def test_enforces_sxm5_gate_and_prints_topology(self) -> None:
+        content = _read(BENCHMARK_NODE_SCRIPT)
+
+        required_snippets = (
+            'readonly EXPECTED_GPU_COUNT=8',
+            'readonly MEMORY_FLOOR_MIB=79000',
+            'nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits',
+            'nvidia-smi topo -m',
+            'print_topology() {',
+            'fail_sxm5_gate() {',
+            'TOPOLOGY_ROWS_WITH_NV',
+        )
+
+        for snippet in required_snippets:
+            assert snippet in content, f"Expected SXM5 gate snippet: {snippet}"
+
+    def test_runs_three_captures_with_explicit_outputs_and_cooldown(self) -> None:
+        content = _read(BENCHMARK_NODE_SCRIPT)
+
+        required_snippets = (
+            'readonly RUN_COUNT=3',
+            'run_single_capture 1',
+            'run_single_capture 2',
+            'run_single_capture 3',
+            '"${ORNN_BENCH_BIN}" run -o "${report_path}"',
+            'sleep "${COOLDOWN_SECONDS}"',
+            'ornn_report_*.json',
+            'Recovered the default report into place.',
+        )
+
+        for snippet in required_snippets:
+            assert snippet in content, f"Expected run cadence snippet: {snippet}"
+
+    def test_only_uses_env_api_key_for_optional_upload(self) -> None:
+        content = _read(BENCHMARK_NODE_SCRIPT)
+
+        assert 'readonly UPLOAD_SETTING="${ORNN_BENCH_UPLOAD:-auto}"' in content
+        assert '[[ -n "${ORNN_API_KEY:-}" ]] || fail' in content
+        assert 'ORNN_API_KEY_PRESENT' in content
+        assert '--upload' in content
+
+        forbidden_patterns = (
+            r'printf .*ORNN_API_KEY',
+            r'write_env_entry "ORNN_API_KEY"',
+            r'>.*ORNN_API_KEY',
+            r'echo .*ORNN_API_KEY',
+        )
+
+        for pattern in forbidden_patterns:
+            assert re.search(pattern, content) is None, (
+                f"benchmark_node.sh should not persist ORNN_API_KEY: matched {pattern!r}"
+            )
