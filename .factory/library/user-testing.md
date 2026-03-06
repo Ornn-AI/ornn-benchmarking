@@ -32,9 +32,11 @@ Manual validation notes for user-facing behavior.
 - Firestore emulator port: `8085`
 - On non-GPU hosts, validate behavior using fixture-driven runs and dependency-missing paths.
 - CLI entrypoint: `./.venv/bin/ornn-bench`
-- Python venv: `./.venv` at repo root `/Users/kushbavaria/ornn-benchmarking`
+- Python venv: `./.venv` at repo root `/Users/kushbavaria/Documents/ornn-benchmarking`
 - Install: `./.venv/bin/python -m pip install -e ".[dev]"`
 - Test fixtures are in `tests/fixtures/sample_report.json` and `tests/fixtures/sample_scored_report.json`
+- The sample report fixtures keep top-level `manifest` empty; validate manifest mapping with `tests/runbook/test_manifest_and_durability.py` or a temporary enriched report fixture instead of relying on `sample_report.json` alone.
+- Bench-core validation on this macOS host does **not** require starting local services; rely on fixture-driven CLI commands and pytest coverage for GPU-specific paths.
 
 ## Flow Validator Guidance: API
 
@@ -118,6 +120,7 @@ Use the `tuistory` skill for TUI/terminal interaction, or direct shell execution
 - CLI testing is read-only (no shared mutable state between subagents)
 - Report file fixtures in `tests/fixtures/` are read-only shared resources
 - Each subagent should write any temporary output files to unique names to avoid collision
+- When running pytest in parallel validator sessions, use a unique `--basetemp=/tmp/<namespace>` per subagent
 - Subagents MUST NOT modify source code or test fixtures
 
 ### What's testable on non-GPU macOS host

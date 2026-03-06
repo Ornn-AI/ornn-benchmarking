@@ -1,0 +1,226 @@
+{
+  "groupId": "runbook-gpu",
+  "testedAt": "2026-03-06T03:59:01Z",
+  "credentials": {
+    "account": "local-shell-runbook",
+    "namespace": "benchcore-runbook"
+  },
+  "toolsUsed": [
+    "Execute",
+    "Read",
+    "Grep",
+    "pytest"
+  ],
+  "assertions": {
+    "VAL-CORE-001": {
+      "status": "pass",
+      "title": "Compute matrix runs across detected GPU count",
+      "steps": [
+        {
+          "action": "Run focused pytest for compute GPU-detection fanout with --basetemp=/tmp/benchcore-runbook-pytest",
+          "expected": "Detection path runs all detected GPUs and records per-GPU CUDA_VISIBLE_DEVICES isolation",
+          "observed": "tests/runbook/test_compute_matrix.py::TestCollectComputeMatrix::test_detected_gpu_count_runs_all_detected_gpus PASSED"
+        },
+        {
+          "action": "Execute fixture-driven collect_compute_matrix(gpu_count=8) through the CLI test surface",
+          "expected": "Metrics show gpu_count=8, per_gpu entries gpu_0..gpu_7, and dtype records isolated to each GPU index",
+          "observed": "compute_gpu_count=8; compute_gpu_keys included gpu_0 through gpu_7; sampled isolation metadata showed gpu_0 dtypes pinned to CUDA_VISIBLE_DEVICES=0 and gpu_7 dtypes pinned to CUDA_VISIBLE_DEVICES=7"
+        },
+        {
+          "action": "Inspect runtime source path",
+          "expected": "Runtime uses detected GPU count and exports CUDA_VISIBLE_DEVICES per GPU iteration",
+          "observed": "src/ornn_bench/runbook/compute.py resolves detect_gpu_count(), iterates range(resolved_gpu_count), and sets CUDA_VISIBLE_DEVICES to str(gpu_index) in both run_mamf_for_dtype() and run_mamf_fixed_shape()"
+        }
+      ],
+      "evidence": {
+        "pytest": [
+          "./.venv/bin/python -m pytest -vv --basetemp=/tmp/benchcore-runbook-pytest tests/runbook/test_compute_matrix.py::TestCollectComputeMatrix::test_detected_gpu_count_runs_all_detected_gpus -> PASSED",
+          "./.venv/bin/python -m pytest -q --basetemp=/tmp/benchcore-runbook-pytest tests/runbook/test_compute_matrix.py tests/runbook/test_interconnect_matrix.py tests/scoring/test_report_scoring_from_sections.py -> exit 0"
+        ],
+        "terminal": {
+          "compute_gpu_count": 8,
+          "compute_gpu_keys": [
+            "gpu_0",
+            "gpu_1",
+            "gpu_2",
+            "gpu_3",
+            "gpu_4",
+            "gpu_5",
+            "gpu_6",
+            "gpu_7"
+          ],
+          "cuda_visible_devices_sample": {
+            "gpu_0": {
+              "bf16": "0",
+              "fp8_e4m3": "0",
+              "fp8_e5m2": "0",
+              "fp16": "0"
+            },
+            "gpu_7": {
+              "bf16": "7",
+              "fp8_e4m3": "7",
+              "fp8_e5m2": "7",
+              "fp16": "7"
+            }
+          }
+        },
+        "source": [
+          "src/ornn_bench/runbook/compute.py: collect_compute_matrix() uses detect_gpu_count() when gpu_count is not injected and loops over range(resolved_gpu_count)",
+          "src/ornn_bench/runbook/compute.py: run_mamf_for_dtype() and run_mamf_fixed_shape() set env={'CUDA_VISIBLE_DEVICES': str(gpu_index)}"
+        ]
+      },
+      "reason": "Fixture-driven runtime evidence and focused pytest confirm compute fanout follows detected GPU count and records per-GPU isolation metadata for each GPU index.",
+      "issues": null
+    },
+    "VAL-CORE-002": {
+      "status": "pass",
+      "title": "Interconnect NCCL all-reduce uses full-node GPU count",
+      "steps": [
+        {
+          "action": "Run focused pytest for 8-GPU NCCL argv handling with --basetemp=/tmp/benchcore-runbook-pytest",
+          "expected": "all_reduce_perf argv contains -g 8 on an 8-GPU node and detection path records gpu_count=8",
+          "observed": "tests/runbook/test_interconnect_matrix.py::TestRunNcclTest::test_all_reduce_1gb_uses_g8_argv_for_8gpu_node PASSED; tests/runbook/test_interconnect_matrix.py::TestCollectInterconnectMatrix::test_detected_gpu_count_is_recorded PASSED; tests/runbook/test_interconnect_matrix.py::TestCollectInterconnectMatrix::test_injected_gpu_count_drives_all_nccl_commands PASSED"
+        },
+        {
+          "action": "Execute fixture-driven collect_interconnect_matrix(gpu_count=8)",
+          "expected": "Runtime evidence shows full-node argv and recorded gpu counts for all_reduce_1gb",
+          "observed": "all_reduce_1gb argv was ['all_reduce_perf', '-b', '1G', '-e', '1G', '-n', '100', '-g', '8']; gpu_count=8; observed_gpu_count=8"
+        },
+        {
+          "action": "Search runtime call path for hardcoded -g 2",
+          "expected": "No runtime NCCL path hardcodes '-g 2'",
+          "observed": "Grep over src/ornn_bench/runbook returned no matches for hardcoded '-g 2' patterns"
+        }
+      ],
+      "evidence": {
+        "pytest": [
+          "./.venv/bin/python -m pytest -vv --basetemp=/tmp/benchcore-runbook-pytest tests/runbook/test_interconnect_matrix.py::TestRunNcclTest::test_all_reduce_1gb_uses_g8_argv_for_8gpu_node tests/runbook/test_interconnect_matrix.py::TestCollectInterconnectMatrix::test_detected_gpu_count_is_recorded tests/runbook/test_interconnect_matrix.py::TestCollectInterconnectMatrix::test_injected_gpu_count_drives_all_nccl_commands -> 3 PASSED",
+          "./.venv/bin/python -m pytest -q --basetemp=/tmp/benchcore-runbook-pytest tests/runbook/test_compute_matrix.py tests/runbook/test_interconnect_matrix.py tests/scoring/test_report_scoring_from_sections.py -> exit 0"
+        ],
+        "terminal": {
+          "all_reduce_1gb_argv": [
+            "all_reduce_perf",
+            "-b",
+            "1G",
+            "-e",
+            "1G",
+            "-n",
+            "100",
+            "-g",
+            "8"
+          ],
+          "gpu_count": 8,
+          "observed_gpu_count": 8
+        },
+        "source": [
+          "src/ornn_bench/runbook/interconnect.py: _build_nccl_command() appends ['-g', str(gpu_count)] to every NCCL test command",
+          "No hardcoded '-g 2' occurrences were found in src/ornn_bench/runbook"
+        ]
+      },
+      "reason": "Targeted tests, runtime output, and source inspection all show the NCCL runner passes the detected GPU count to -g and does not fall back to a hardcoded value.",
+      "issues": null
+    },
+    "VAL-CORE-003": {
+      "status": "pass",
+      "title": "Interconnect report captures bus bandwidth summary for required tests",
+      "steps": [
+        {
+          "action": "Run focused pytest for interconnect bus-bandwidth summary with --basetemp=/tmp/benchcore-runbook-pytest",
+          "expected": "bus_bandwidth_summary contains every required NCCL test with avg_busbw and max_busbw fields",
+          "observed": "tests/runbook/test_interconnect_matrix.py::TestCollectInterconnectMatrix::test_bus_bandwidth_summary_present PASSED"
+        },
+        {
+          "action": "Execute fixture-driven collect_interconnect_matrix(gpu_count=8)",
+          "expected": "Runtime metrics include required bus_bandwidth_summary entries and numeric avg/max bus bandwidth fields",
+          "observed": "required bus_bandwidth_summary keys were all_gather, all_reduce_1gb, all_reduce_sweep, broadcast, reduce_scatter, sendrecv; sampled all_reduce_1gb summary reported avg_busbw=148.32 and max_busbw=148.32"
+        },
+        {
+          "action": "Inspect runtime source path",
+          "expected": "Interconnect collection populates summary entries for each required test",
+          "observed": "src/ornn_bench/runbook/interconnect.py writes bus_bandwidth_summary[test_name] = {'avg_busbw': ..., 'max_busbw': ...} inside the REQUIRED_NCCL_TESTS loop"
+        }
+      ],
+      "evidence": {
+        "pytest": [
+          "./.venv/bin/python -m pytest -vv --basetemp=/tmp/benchcore-runbook-pytest tests/runbook/test_interconnect_matrix.py::TestCollectInterconnectMatrix::test_bus_bandwidth_summary_present -> PASSED",
+          "./.venv/bin/python -m pytest -q --basetemp=/tmp/benchcore-runbook-pytest tests/runbook/test_compute_matrix.py tests/runbook/test_interconnect_matrix.py tests/scoring/test_report_scoring_from_sections.py -> exit 0"
+        ],
+        "terminal": {
+          "required_bus_bandwidth_summary_keys": [
+            "all_gather",
+            "all_reduce_1gb",
+            "all_reduce_sweep",
+            "broadcast",
+            "reduce_scatter",
+            "sendrecv"
+          ],
+          "all_reduce_1gb_summary": {
+            "avg_busbw": 148.32,
+            "max_busbw": 148.32
+          }
+        },
+        "source": [
+          "src/ornn_bench/runbook/interconnect.py: collect_interconnect_matrix() initializes bus_bandwidth_summary and fills avg_busbw/max_busbw for every REQUIRED_NCCL_TESTS item"
+        ]
+      },
+      "reason": "Interconnect fixtures, targeted pytest, and runtime output all confirm that the report captures bus-bandwidth summaries for every required NCCL test with avg/max numeric fields.",
+      "issues": null
+    },
+    "VAL-CROSS-003": {
+      "status": "pass",
+      "title": "Interconnect AR metric used for scoring corresponds to full-node (`-g 8`) semantics",
+      "steps": [
+        {
+          "action": "Run focused pytest for scoring from documented section metrics with --basetemp=/tmp/benchcore-runbook-pytest",
+          "expected": "Scoring uses the documented interconnect source metric and produces valid normalized components",
+          "observed": "tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics PASSED"
+        },
+        {
+          "action": "Execute fixture-driven 8-GPU interconnect collection and derive scores from sections",
+          "expected": "AR normalization reads the full-node all_reduce_1gb bus-bandwidth metric produced by -g 8 semantics",
+          "observed": "AR component source resolved to interconnect.bus_bandwidth_summary.all_reduce_1gb.avg_busbw; full-node fixture recorded gpu_count=8, observed_gpu_count=8, argv ending in '-g 8', avg_busbw=148.32, and derived_ar_component=1.0"
+        },
+        {
+          "action": "Inspect scoring source",
+          "expected": "Scoring documents a stable AR source path and full-node reference value",
+          "observed": "src/ornn_bench/scoring.py sets AR_COMPONENT_SOURCE='interconnect.bus_bandwidth_summary.all_reduce_1gb.avg_busbw' and SECTION_METRIC_REFS['ar']=148.32"
+        }
+      ],
+      "evidence": {
+        "pytest": [
+          "./.venv/bin/python -m pytest -vv --basetemp=/tmp/benchcore-runbook-pytest tests/scoring/test_report_scoring_from_sections.py::TestReportScoringFromRunbookSections::test_report_scores_use_normalized_components_from_documented_metrics -> PASSED",
+          "./.venv/bin/python -m pytest -q --basetemp=/tmp/benchcore-runbook-pytest tests/runbook/test_compute_matrix.py tests/runbook/test_interconnect_matrix.py tests/scoring/test_report_scoring_from_sections.py -> exit 0"
+        ],
+        "terminal": {
+          "ar_component_source": "interconnect.bus_bandwidth_summary.all_reduce_1gb.avg_busbw",
+          "ar_reference": 148.32,
+          "all_reduce_1gb_gpu_count": 8,
+          "all_reduce_1gb_observed_gpu_count": 8,
+          "all_reduce_1gb_argv": [
+            "all_reduce_perf",
+            "-b",
+            "1G",
+            "-e",
+            "1G",
+            "-n",
+            "100",
+            "-g",
+            "8"
+          ],
+          "all_reduce_1gb_avg_busbw": 148.32,
+          "derived_ar_component": 1.0,
+          "score_status": "valid"
+        },
+        "source": [
+          "src/ornn_bench/scoring.py: AR_COMPONENT_SOURCE points to interconnect.bus_bandwidth_summary.all_reduce_1gb.avg_busbw",
+          "src/ornn_bench/scoring.py: SECTION_METRIC_REFS['ar'] is 148.32, matching the full-node all_reduce_1gb fixture used for normalization"
+        ]
+      },
+      "reason": "The scoring path is explicitly documented, the full-node fixture produces -g 8 semantics and 148.32 bus bandwidth, and deriving scores from that fixture yields a normalized AR component of 1.0.",
+      "issues": null
+    }
+  },
+  "frictions": [],
+  "blockers": [],
+  "summary": "Tested 4 assertions: 4 passed, 0 failed, 0 blocked. Validation used fixture-driven pytest and source-backed CLI evidence on the macOS non-GPU host, with no blockers encountered."
+}

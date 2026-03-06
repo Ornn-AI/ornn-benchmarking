@@ -1,0 +1,47 @@
+{
+  "milestone": "bench-core",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 14,
+    "passed": 14,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-CORE-001",
+    "VAL-CORE-002",
+    "VAL-CORE-003",
+    "VAL-CORE-004",
+    "VAL-CORE-005",
+    "VAL-CORE-006",
+    "VAL-CORE-007",
+    "VAL-CORE-008",
+    "VAL-CORE-009",
+    "VAL-CORE-010",
+    "VAL-CORE-011",
+    "VAL-CORE-012",
+    "VAL-CROSS-003",
+    "VAL-CROSS-005"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Corrected the repository venv path and documented that bench-core validation on the macOS host is fixture-driven and requires no local services.",
+      "source": "setup"
+    },
+    {
+      "target": "user-testing.md",
+      "description": "Added CLI flow-validator isolation guidance to use a unique pytest --basetemp for each parallel validator session.",
+      "source": "setup"
+    },
+    {
+      "target": "user-testing.md",
+      "description": "Documented that sample report fixtures keep top-level manifest empty, so manifest mapping must be validated with manifest enrichment tests or a temporary enriched report fixture.",
+      "source": "flow-report"
+    }
+  ],
+  "previousRound": null
+}
