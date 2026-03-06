@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK_NODE_SCRIPT = ROOT / "ornn-bench-infra" / "benchmark_node.sh"
 
-ORNN_BENCH_VERSION = "0.1.0"
+ORNN_BENCH_VERSION = "0.2.0"
 MAMF_FINDER_COMMIT = "7c660da71e533fdb5de141591379d3c8070ef272"
 NVBANDWIDTH_HEAD = "66746a3bef61c8c2e12ab34955310da70b9e38cb"
 NCCL_TESTS_COMMIT = "ae98985f5599617be94042f4aa3637d10014ce89"

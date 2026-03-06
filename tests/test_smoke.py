@@ -7,7 +7,7 @@ def test_version_importable() -> None:
     """Verify the package version is importable."""
     from ornn_bench import __version__
 
-    assert __version__ == "0.1.0"
+    assert __version__ == "0.2.0"
 
 
 def test_cli_app_importable() -> None:

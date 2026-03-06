@@ -27,7 +27,7 @@ class Settings:
     app_description: str = (
         "API for receiving, storing, and verifying GPU benchmark results."
     )
-    app_version: str = "0.1.0"
+    app_version: str = "0.2.0"
 
     # Rate limiting (per API key)
     rate_limit_requests: int = field(

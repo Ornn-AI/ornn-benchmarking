@@ -12,7 +12,7 @@ BENCHMARK_NODE_SCRIPT = INFRA_DIR / "benchmark_node.sh"
 PROVIDER_NOTES_DIR = INFRA_DIR / "provider-notes"
 
 REQUIRED_TOOLCHAIN_VALUES = {
-    "ORNN_BENCH_VERSION": "0.1.0",
+    "ORNN_BENCH_VERSION": "0.2.0",
     "MAMF_FINDER_REPO": "https://github.com/stas00/ml-engineering.git",
     "MAMF_FINDER_COMMIT": "7c660da71e533fdb5de141591379d3c8070ef272",
     "MAMF_FINDER_RELPATH": "compute/accelerator/benchmarks/mamf-finder.py",

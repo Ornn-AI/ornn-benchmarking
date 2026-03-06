@@ -6,10 +6,28 @@ entrypoint correctly and that distribution metadata is release-ready.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
 from importlib.metadata import entry_points, metadata, version
+
+ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+
+
+def _strip_ansi(text: str) -> str:
+    return ANSI_PATTERN.sub("", text)
+
+
+def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, "COLUMNS": "120"}
+    return subprocess.run(
+        [sys.executable, "-m", "ornn_bench", *args],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        env=env,
+    )
 
 # ---------------------------------------------------------------------------
 # Entrypoint wiring
@@ -35,12 +53,7 @@ class TestConsoleScriptEntrypoint:
 
     def test_version_via_cli(self) -> None:
         """``ornn-bench --version`` should print a semver-like string."""
-        result = subprocess.run(
-            [sys.executable, "-m", "ornn_bench", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        result = _run_cli("--version")
         assert result.returncode == 0
         assert re.search(r"\d+\.\d+\.\d+", result.stdout), (
             f"Expected semver in output: {result.stdout!r}"
@@ -48,24 +61,15 @@ class TestConsoleScriptEntrypoint:
 
     def test_help_lists_subcommands(self) -> None:
         """``ornn-bench --help`` should list run, info, report, upload."""
-        result = subprocess.run(
-            [sys.executable, "-m", "ornn_bench", "--help"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        result = _run_cli("--help")
         assert result.returncode == 0
+        clean_stdout = _strip_ansi(result.stdout)
         for cmd in ("run", "info", "report", "upload"):
-            assert cmd in result.stdout, f"Missing subcommand '{cmd}' in --help output"
+            assert cmd in clean_stdout, f"Missing subcommand '{cmd}' in --help output"
 
     def test_python_m_invocation(self) -> None:
         """``python -m ornn_bench`` should work as an alternative entrypoint."""
-        result = subprocess.run(
-            [sys.executable, "-m", "ornn_bench", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        result = _run_cli("--version")
         assert result.returncode == 0
         assert "ornn-bench" in result.stdout
 
@@ -153,53 +157,29 @@ class TestCommandRouting:
 
     def test_run_help(self) -> None:
         """``ornn-bench run --help`` should be routable and describe scope flags."""
-        result = subprocess.run(
-            [sys.executable, "-m", "ornn_bench", "run", "--help"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        result = _run_cli("run", "--help")
         assert result.returncode == 0
-        assert "--compute-only" in result.stdout
-        assert "--memory-only" in result.stdout
-        assert "--interconnect-only" in result.stdout
+        clean_stdout = _strip_ansi(result.stdout)
+        assert "--compute-only" in clean_stdout
+        assert "--memory-only" in clean_stdout
+        assert "--interconnect-only" in clean_stdout
 
     def test_info_help(self) -> None:
         """``ornn-bench info --help`` should be routable."""
-        result = subprocess.run(
-            [sys.executable, "-m", "ornn_bench", "info", "--help"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        result = _run_cli("info", "--help")
         assert result.returncode == 0
 
     def test_report_help(self) -> None:
         """``ornn-bench report --help`` should be routable."""
-        result = subprocess.run(
-            [sys.executable, "-m", "ornn_bench", "report", "--help"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        result = _run_cli("report", "--help")
         assert result.returncode == 0
 
     def test_upload_help(self) -> None:
         """``ornn-bench upload --help`` should be routable."""
-        result = subprocess.run(
-            [sys.executable, "-m", "ornn_bench", "upload", "--help"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        result = _run_cli("upload", "--help")
         assert result.returncode == 0
 
     def test_unknown_command_fails(self) -> None:
         """Unknown sub-command should produce non-zero exit code."""
-        result = subprocess.run(
-            [sys.executable, "-m", "ornn_bench", "nonexistent"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        result = _run_cli("nonexistent")
         assert result.returncode != 0
