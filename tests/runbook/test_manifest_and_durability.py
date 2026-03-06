@@ -23,7 +23,9 @@ from ornn_bench.runbook.manifest import (
     ManifestStatus,
 )
 from ornn_bench.runner import (
+    SECTION_ORDER,
     DurableRunOrchestrator,
+    RunOrchestrator,
     SectionRunner,
     StubSectionRunner,
 )
@@ -45,6 +47,69 @@ class InterruptingSectionRunner(SectionRunner):
 
     def run(self) -> SectionResult:
         raise KeyboardInterrupt("Simulated interruption")
+
+
+class MetricsSectionRunner(SectionRunner):
+    """Runner that returns completed results with predefined metrics."""
+
+    def __init__(self, name: str, metrics: dict[str, object]) -> None:
+        super().__init__(name)
+        self._metrics = metrics
+
+    def run(self) -> SectionResult:
+        return SectionResult(
+            name=self.name,
+            status=BenchmarkStatus.COMPLETED,
+            started_at="2024-01-01T00:00:00Z",
+            finished_at="2024-01-01T00:00:01Z",
+            metrics=self._metrics,
+        )
+
+
+def _sample_preflight_metrics() -> dict[str, object]:
+    return {
+        "os": "Ubuntu 22.04.3 LTS",
+        "os_version": "#101-Ubuntu SMP Fri Nov 10 00:00:00 UTC 2024",
+        "kernel": "5.15.0-91-generic",
+        "cpu_model": "Intel(R) Xeon(R) Platinum 8480+",
+        "numa_nodes": 2,
+        "pytorch_version": "2.1.2",
+        "driver_version": "535.129.03",
+        "cuda_version": "12.2",
+        "software_versions": {
+            "python": "3.10.13",
+            "driver": "535.129.03",
+            "cuda": "12.2",
+        },
+        "gpu_inventory": {
+            "attached_gpus": 2,
+            "gpu_uuids": [
+                "GPU-12345678-abcd-1234-abcd-123456789abc",
+                "GPU-87654321-dcba-4321-dcba-cba987654321",
+            ],
+            "gpus": [
+                {
+                    "uuid": "GPU-12345678-abcd-1234-abcd-123456789abc",
+                    "product_name": "NVIDIA H100 80GB HBM3",
+                    "memory_total_mib": 81920,
+                },
+                {
+                    "uuid": "GPU-87654321-dcba-4321-dcba-cba987654321",
+                    "product_name": "NVIDIA H100 80GB HBM3",
+                    "memory_total_mib": 81920,
+                },
+            ],
+        },
+        "nvlink_topology": [],
+        "ecc_baseline": {},
+    }
+
+
+def _make_enriched_runners() -> dict[str, SectionRunner]:
+    runners = {name: StubSectionRunner(name) for name in SECTION_ORDER}
+    runners["pre-flight"] = MetricsSectionRunner("pre-flight", _sample_preflight_metrics())
+    runners["manifest"] = ManifestRunner()
+    return runners
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +255,42 @@ class TestManifestRunner:
         assert result.name == "manifest"
 
 
+class TestBenchmarkReportEnrichment:
+    """Tests for top-level report enrichment from section outputs."""
+
+    def test_orchestrator_maps_preflight_metrics_to_system_inventory(self) -> None:
+        """VAL-CORE-004: system_inventory is derived from pre-flight metrics."""
+        report = RunOrchestrator(runners=_make_enriched_runners()).execute()
+
+        assert report.system_inventory.os_info == "Ubuntu 22.04.3 LTS"
+        assert report.system_inventory.kernel_version == "5.15.0-91-generic"
+        assert report.system_inventory.cpu_model == "Intel(R) Xeon(R) Platinum 8480+"
+        assert report.system_inventory.numa_nodes == 2
+        assert report.system_inventory.pytorch_version == "2.1.2"
+        assert len(report.system_inventory.gpus) == 2
+
+        first_gpu = report.system_inventory.gpus[0]
+        assert first_gpu.uuid == "GPU-12345678-abcd-1234-abcd-123456789abc"
+        assert first_gpu.name == "NVIDIA H100 80GB HBM3"
+        assert first_gpu.driver_version == "535.129.03"
+        assert first_gpu.cuda_version == "12.2"
+        assert first_gpu.memory_total_mb == 81920
+
+    def test_orchestrator_maps_manifest_metrics_to_report_manifest(self) -> None:
+        """VAL-CORE-005: manifest section metrics populate report.manifest."""
+        report = RunOrchestrator(runners=_make_enriched_runners()).execute()
+
+        manifest_section = next(
+            section for section in report.sections if section.name == "manifest"
+        )
+        assert report.manifest == manifest_section.metrics
+        assert report.manifest["entries"]
+        summary = report.manifest["summary"]
+        assert isinstance(summary, dict)
+        assert summary["produced"] > 0
+        assert summary["total"] >= summary["produced"]
+
+
 # ---------------------------------------------------------------------------
 # Durability tests (VAL-RUNBOOK-009)
 # ---------------------------------------------------------------------------
@@ -318,3 +419,22 @@ class TestDurableRunOrchestrator:
             # Interrupted section should be marked failed
             assert sections["compute"]["status"] == "failed"
             assert "interrupted" in (sections["compute"].get("error", "")).lower()
+
+    def test_persisted_report_includes_system_inventory_and_manifest(self) -> None:
+        """VAL-CORE-004/005: persisted JSON includes enriched top-level fields."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "report.json"
+            orch = DurableRunOrchestrator(
+                runners=_make_enriched_runners(),
+                output_path=output_path,
+            )
+
+            orch.execute()
+
+            data = json.loads(output_path.read_text())
+            assert data["system_inventory"]["kernel_version"] == "5.15.0-91-generic"
+            assert data["system_inventory"]["gpus"][0]["uuid"] == (
+                "GPU-12345678-abcd-1234-abcd-123456789abc"
+            )
+            assert data["manifest"]["entries"]
+            assert data["manifest"]["summary"]["produced"] > 0
