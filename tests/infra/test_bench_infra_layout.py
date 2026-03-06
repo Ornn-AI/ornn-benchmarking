@@ -108,3 +108,69 @@ class TestShellScripts:
                 assert re.search(pattern, content) is None, (
                     f"Script should not mutate toolchain.env: {path} matched {pattern!r}"
                 )
+
+
+class TestProvisionScript:
+    def test_sources_toolchain_lock_and_writes_runtime_env(self) -> None:
+        content = _read(PROVISION_SCRIPT)
+
+        assert 'source "${TOOLCHAIN_ENV}"' in content
+        assert 'readonly RUNTIME_ENV="${TOOLS_ROOT}/runtime.env"' in content
+        assert 'write_runtime_env() {' in content
+        assert 'mv "${temp_env}" "${RUNTIME_ENV}"' in content
+
+    def test_installs_and_verifies_pinned_toolchain_components(self) -> None:
+        content = _read(PROVISION_SCRIPT)
+
+        required_snippets = (
+            '"ornn-bench==${ORNN_BENCH_VERSION}"',
+            '"torch==${TORCH_VERSION}"',
+            'https://download.pytorch.org/whl/${TORCH_CUDA_WHEEL}',
+            'sync_git_checkout "${MAMF_FINDER_REPO}" "${MAMF_REPO_DIR}" "${MAMF_FINDER_COMMIT}"',
+            'verify_git_ref "${MAMF_REPO_DIR}" "${MAMF_FINDER_COMMIT}" "mamf-finder repo"',
+            'sync_git_checkout "${NVBANDWIDTH_REPO}" "${NVBANDWIDTH_REPO_DIR}" "${NVBANDWIDTH_TAG}"',
+            'grep -Fxq "${NVBANDWIDTH_TAG}"',
+            'sync_git_checkout "${NCCL_TESTS_REPO}" "${NCCL_TESTS_REPO_DIR}" "${NCCL_TESTS_COMMIT}"',
+            'verify_git_ref "${NCCL_TESTS_REPO_DIR}" "${NCCL_TESTS_COMMIT}" "nccl-tests repo"',
+            '"libnccl2=${NCCL_DEV_VERSION}"',
+            '"libnccl-dev=${NCCL_DEV_VERSION}"',
+        )
+
+        for snippet in required_snippets:
+            assert snippet in content, f"Expected pinned install snippet: {snippet}"
+
+    def test_hard_fails_when_pinned_nccl_packages_are_unavailable(self) -> None:
+        content = _read(PROVISION_SCRIPT)
+
+        assert 'ensure_apt_package_version_available() {' in content
+        assert 'apt-cache madison "${package_name}"' in content
+        assert 'Pinned ${package_label} package ${package_name}=${version} is unavailable.' in content
+        assert 'Ensure the NVIDIA CUDA apt repository for CUDA ${CUDA_VERSION} is configured' in content
+
+        assert (
+            'ensure_apt_package_version_available "libnccl2" '
+            '"${NCCL_DEV_VERSION}" "NCCL runtime"' in content
+        )
+        assert (
+            'ensure_apt_package_version_available "libnccl-dev" '
+            '"${NCCL_DEV_VERSION}" "NCCL development"' in content
+        )
+
+    def test_runtime_env_exports_discovered_tool_paths(self) -> None:
+        content = _read(PROVISION_SCRIPT)
+
+        exported_keys = (
+            'ORNN_BENCH_BIN',
+            'MAMF_FINDER_PATH',
+            'NVBANDWIDTH_PATH',
+            'ALL_REDUCE_PERF_PATH',
+            'REDUCE_SCATTER_PERF_PATH',
+            'ALL_GATHER_PERF_PATH',
+            'BROADCAST_PERF_PATH',
+            'SENDRECV_PERF_PATH',
+            'CUDA_HOME',
+            'NCCL_LIB_DIR',
+        )
+
+        for key in exported_keys:
+            assert f"printf '{key}=\"%s\"\\n'" in content
